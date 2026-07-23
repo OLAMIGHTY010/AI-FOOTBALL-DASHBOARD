@@ -1,0 +1,131 @@
+
+
+    <style>
+    .pitch-container {
+        position: relative;
+        width: 500px;
+        height: 750px;
+        margin: 40px auto;
+    }
+    .pitch {
+        position: absolute;
+        top: 0; left: 0; width: 100%; height: 100%;
+        background: linear-gradient(to bottom, #4d8c36, #3b6d28);
+        border: 3px solid white;
+        box-shadow: inset 0 0 20px rgba(0,0,0,0.3), 0 10px 20px rgba(0,0,0,0.2);
+        box-sizing: border-box;
+        overflow: hidden;
+    }
+    .line { position: absolute; border: 2px solid white; box-sizing: border-box; }
+    
+    .player-node {
+        position: absolute;
+        transform: translate(-50%, -50%);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        z-index: 10;
+    }
+    .player-photo {
+        width: 50px; height: 50px; border-radius: 50%;
+        object-fit: cover; border: 2px solid white; background-color: white;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+    }
+    .player-name {
+        margin-top: 5px; background: rgba(0,0,0,0.6); color: white;
+        padding: 2px 6px; border-radius: 4px; font-size: 10px;
+        white-space: nowrap;
+    }
+    .tooltip .tooltiptext {
+      visibility: hidden;
+      width: 140px;
+      background-color: #333;
+      color: #fff;
+      text-align: center;
+      border-radius: 6px;
+      padding: 5px;
+      position: absolute;
+      z-index: 100;
+      bottom: 125%; 
+      left: 50%; 
+      margin-left: -70px;
+      opacity: 0;
+      transition: opacity 0.3s;
+      font-size: 10px;
+    }
+    .tooltip:hover .tooltiptext {
+      visibility: visible;
+      opacity: 1;
+    }
+    </style>
+    
+<div class="pitch-container">
+<div class="line" style="top: -20px; left: 50%; transform: translateX(-50%); width: 120px; height: 20px; background: repeating-linear-gradient(45deg, transparent, transparent 5px, rgba(255,255,255,0.5) 5px, rgba(255,255,255,0.5) 10px);"></div>
+<div class="line" style="bottom: -20px; left: 50%; transform: translateX(-50%); width: 120px; height: 20px; background: repeating-linear-gradient(45deg, transparent, transparent 5px, rgba(255,255,255,0.5) 5px, rgba(255,255,255,0.5) 10px);"></div>
+<div class="pitch">
+<div class="line" style="top: 50%; left: 0; width: 100%; height: 0; transform: translateY(-50%);"></div>
+<div class="line" style="top: 50%; left: 50%; width: 100px; height: 100px; border-radius: 50%; transform: translate(-50%, -50%);"></div>
+<div style="position: absolute; top: 50%; left: 50%; width: 8px; height: 8px; background: white; border-radius: 50%; transform: translate(-50%, -50%);"></div>
+<div class="line" style="top: -2px; left: 50%; transform: translateX(-50%); width: 240px; height: 120px;"></div>
+<div class="line" style="top: -2px; left: 50%; transform: translateX(-50%); width: 100px; height: 40px;"></div>
+<div style="position: absolute; top: 90px; left: 50%; width: 6px; height: 6px; background: white; border-radius: 50%; transform: translateX(-50%);"></div>
+<div style="position: absolute; top: 118px; left: 50%; width: 80px; height: 40px; transform: translateX(-50%); overflow: hidden;">
+<div style="position: absolute; top: -40px; left: 0; width: 80px; height: 80px; border: 2px solid white; border-radius: 50%; box-sizing: border-box;"></div>
+</div>
+<div class="line" style="bottom: -2px; left: 50%; transform: translateX(-50%); width: 240px; height: 120px;"></div>
+<div class="line" style="bottom: -2px; left: 50%; transform: translateX(-50%); width: 100px; height: 40px;"></div>
+<div style="position: absolute; bottom: 90px; left: 50%; width: 6px; height: 6px; background: white; border-radius: 50%; transform: translateX(-50%);"></div>
+<div style="position: absolute; bottom: 118px; left: 50%; width: 80px; height: 40px; transform: translateX(-50%); overflow: hidden;">
+<div style="position: absolute; bottom: -40px; left: 0; width: 80px; height: 80px; border: 2px solid white; border-radius: 50%; box-sizing: border-box;"></div>
+</div>
+<div class="line" style="top: -15px; left: -15px; width: 30px; height: 30px; border-radius: 50%;"></div>
+<div class="line" style="top: -15px; right: -15px; width: 30px; height: 30px; border-radius: 50%;"></div>
+<div class="line" style="bottom: -15px; left: -15px; width: 30px; height: 30px; border-radius: 50%;"></div>
+<div class="line" style="bottom: -15px; right: -15px; width: 30px; height: 30px; border-radius: 50%;"></div>
+</div>
+<div class="player-node tooltip" style="top: 15%; left: 33%;">
+<img class="player-photo" src="https://media.api-sports.io/football/players/2298.png" />
+<div class="player-name">C. Hudson-Odoi</div>
+<span class="tooltiptext">Pos: Attacker<br>Age: 25<br>Form: 7.082758</span>
+</div><div class="player-node tooltip" style="top: 15%; left: 66%;">
+<img class="player-photo" src="https://media.api-sports.io/football/players/1468.png" />
+<div class="player-name">E. Nketiah</div>
+<span class="tooltiptext">Pos: Attacker<br>Age: 26<br>Form: 6.85</span>
+</div><div class="player-node tooltip" style="top: 40%; left: 16%;">
+<img class="player-photo" src="https://media.api-sports.io/football/players/278133.png" />
+<div class="player-name">Oscar Bobb</div>
+<span class="tooltiptext">Pos: Midfielder<br>Age: 22<br>Form: 7.13</span>
+</div><div class="player-node tooltip" style="top: 40%; left: 33%;">
+<img class="player-photo" src="https://media.api-sports.io/football/players/237129.png" />
+<div class="player-name">P. Sarr</div>
+<span class="tooltiptext">Pos: Midfielder<br>Age: 23<br>Form: 7.002941</span>
+</div><div class="player-node tooltip" style="top: 40%; left: 50%;">
+<img class="player-photo" src="https://media.api-sports.io/football/players/19130.png" />
+<div class="player-name">K. Phillips</div>
+<span class="tooltiptext">Pos: Midfielder<br>Age: 30<br>Form: 6.65</span>
+</div><div class="player-node tooltip" style="top: 40%; left: 66%;">
+<img class="player-photo" src="https://media.api-sports.io/football/players/863.png" />
+<div class="player-name">R. Bentancur</div>
+<span class="tooltiptext">Pos: Midfielder<br>Age: 28<br>Form: 6.804347</span>
+</div><div class="player-node tooltip" style="top: 40%; left: 83%;">
+<img class="player-photo" src="https://media.api-sports.io/football/players/180560.png" />
+<div class="player-name">H. Mejbri</div>
+<span class="tooltiptext">Pos: Midfielder<br>Age: 22<br>Form: 6.875</span>
+</div><div class="player-node tooltip" style="top: 68%; left: 25%;">
+<img class="player-photo" src="https://media.api-sports.io/football/players/627.png" />
+<div class="player-name">K. Walker</div>
+<span class="tooltiptext">Pos: Defender<br>Age: 35<br>Form: 7.1375</span>
+</div><div class="player-node tooltip" style="top: 68%; left: 50%;">
+<img class="player-photo" src="https://media.api-sports.io/football/players/1600.png" />
+<div class="player-name">K. Tsimikas</div>
+<span class="tooltiptext">Pos: Defender<br>Age: 29<br>Form: 7.016666</span>
+</div><div class="player-node tooltip" style="top: 68%; left: 75%;">
+<img class="player-photo" src="https://media.api-sports.io/football/players/129033.png" />
+<div class="player-name">J. Gvardiol</div>
+<span class="tooltiptext">Pos: Defender<br>Age: 23<br>Form: 7.35</span>
+</div><div class="player-node tooltip" style="top: 88%; left: 50%;">
+<img class="player-photo" src="https://media.api-sports.io/football/players/280.png" />
+<div class="player-name">Alisson Becker</div>
+<span class="tooltiptext">Pos: Goalkeeper<br>Age: 33<br>Form: 7.035714</span>
+</div>
+</div>
