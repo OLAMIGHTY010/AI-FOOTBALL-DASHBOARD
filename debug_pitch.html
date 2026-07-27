@@ -59,7 +59,8 @@
     }
     </style>
     
-<div class="pitch-container">
+<div class="pitch-container" id="pitch-container">
+<button onclick="exportLineup()" style="position:absolute; top: 10px; right: 10px; padding: 10px 15px; background: #1DB954; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; z-index: 1000; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">📸 Download Lineup</button>
 <div class="line" style="top: -20px; left: 50%; transform: translateX(-50%); width: 120px; height: 20px; background: repeating-linear-gradient(45deg, transparent, transparent 5px, rgba(255,255,255,0.5) 5px, rgba(255,255,255,0.5) 10px);"></div>
 <div class="line" style="bottom: -20px; left: 50%; transform: translateX(-50%); width: 120px; height: 20px; background: repeating-linear-gradient(45deg, transparent, transparent 5px, rgba(255,255,255,0.5) 5px, rgba(255,255,255,0.5) 10px);"></div>
 <div class="pitch">
@@ -83,49 +84,91 @@
 <div class="line" style="bottom: -15px; left: -15px; width: 30px; height: 30px; border-radius: 50%;"></div>
 <div class="line" style="bottom: -15px; right: -15px; width: 30px; height: 30px; border-radius: 50%;"></div>
 </div>
-<div class="player-node tooltip" style="top: 15%; left: 33%;">
-<img class="player-photo" src="https://media.api-sports.io/football/players/2298.png" />
-<div class="player-name">C. Hudson-Odoi</div>
-<span class="tooltiptext">Pos: Attacker<br>Age: 25<br>Form: 7.082758</span>
-</div><div class="player-node tooltip" style="top: 15%; left: 66%;">
-<img class="player-photo" src="https://media.api-sports.io/football/players/1468.png" />
+<div class="player-node tooltip" draggable="true" style="top: 15%; left: 33%; cursor: grab;">
+<img class="player-photo" src="https://media.api-sports.io/football/players/1468.png" draggable="false" />
 <div class="player-name">E. Nketiah</div>
 <span class="tooltiptext">Pos: Attacker<br>Age: 26<br>Form: 6.85</span>
-</div><div class="player-node tooltip" style="top: 40%; left: 16%;">
-<img class="player-photo" src="https://media.api-sports.io/football/players/278133.png" />
+</div><div class="player-node tooltip" draggable="true" style="top: 15%; left: 66%; cursor: grab;">
+<img class="player-photo" src="https://media.api-sports.io/football/players/284324.png" draggable="false" />
+<div class="player-name">A. Garnacho</div>
+<span class="tooltiptext">Pos: Attacker<br>Age: 21<br>Form: 7.069444</span>
+</div><div class="player-node tooltip" draggable="true" style="top: 40%; left: 20%; cursor: grab;">
+<img class="player-photo" src="https://media.api-sports.io/football/players/278133.png" draggable="false" />
 <div class="player-name">Oscar Bobb</div>
 <span class="tooltiptext">Pos: Midfielder<br>Age: 22<br>Form: 7.13</span>
-</div><div class="player-node tooltip" style="top: 40%; left: 33%;">
-<img class="player-photo" src="https://media.api-sports.io/football/players/237129.png" />
-<div class="player-name">P. Sarr</div>
-<span class="tooltiptext">Pos: Midfielder<br>Age: 23<br>Form: 7.002941</span>
-</div><div class="player-node tooltip" style="top: 40%; left: 50%;">
-<img class="player-photo" src="https://media.api-sports.io/football/players/19130.png" />
+</div><div class="player-node tooltip" draggable="true" style="top: 40%; left: 40%; cursor: grab;">
+<img class="player-photo" src="https://media.api-sports.io/football/players/19130.png" draggable="false" />
 <div class="player-name">K. Phillips</div>
 <span class="tooltiptext">Pos: Midfielder<br>Age: 30<br>Form: 6.65</span>
-</div><div class="player-node tooltip" style="top: 40%; left: 66%;">
-<img class="player-photo" src="https://media.api-sports.io/football/players/863.png" />
-<div class="player-name">R. Bentancur</div>
-<span class="tooltiptext">Pos: Midfielder<br>Age: 28<br>Form: 6.804347</span>
-</div><div class="player-node tooltip" style="top: 40%; left: 83%;">
-<img class="player-photo" src="https://media.api-sports.io/football/players/180560.png" />
-<div class="player-name">H. Mejbri</div>
-<span class="tooltiptext">Pos: Midfielder<br>Age: 22<br>Form: 6.875</span>
-</div><div class="player-node tooltip" style="top: 68%; left: 25%;">
-<img class="player-photo" src="https://media.api-sports.io/football/players/627.png" />
-<div class="player-name">K. Walker</div>
-<span class="tooltiptext">Pos: Defender<br>Age: 35<br>Form: 7.1375</span>
-</div><div class="player-node tooltip" style="top: 68%; left: 50%;">
-<img class="player-photo" src="https://media.api-sports.io/football/players/1600.png" />
-<div class="player-name">K. Tsimikas</div>
-<span class="tooltiptext">Pos: Defender<br>Age: 29<br>Form: 7.016666</span>
-</div><div class="player-node tooltip" style="top: 68%; left: 75%;">
-<img class="player-photo" src="https://media.api-sports.io/football/players/129033.png" />
-<div class="player-name">J. Gvardiol</div>
-<span class="tooltiptext">Pos: Defender<br>Age: 23<br>Form: 7.35</span>
-</div><div class="player-node tooltip" style="top: 88%; left: 50%;">
-<img class="player-photo" src="https://media.api-sports.io/football/players/280.png" />
-<div class="player-name">Alisson Becker</div>
-<span class="tooltiptext">Pos: Goalkeeper<br>Age: 33<br>Form: 7.035714</span>
+</div><div class="player-node tooltip" draggable="true" style="top: 40%; left: 60%; cursor: grab;">
+<img class="player-photo" src="https://media.api-sports.io/football/players/237129.png" draggable="false" />
+<div class="player-name">P. Sarr</div>
+<span class="tooltiptext">Pos: Midfielder<br>Age: 23<br>Form: 7.002941</span>
+</div><div class="player-node tooltip" draggable="true" style="top: 40%; left: 80%; cursor: grab;">
+<img class="player-photo" src="https://media.api-sports.io/football/players/1161.png" draggable="false" />
+<div class="player-name">E. Smith Rowe</div>
+<span class="tooltiptext">Pos: Midfielder<br>Age: 25<br>Form: 6.775</span>
+</div><div class="player-node tooltip" draggable="true" style="top: 68%; left: 20%; cursor: grab;">
+<img class="player-photo" src="https://media.api-sports.io/football/players/19959.png" draggable="false" />
+<div class="player-name">B. White</div>
+<span class="tooltiptext">Pos: Defender<br>Age: 28<br>Form: 7.227777</span>
+</div><div class="player-node tooltip" draggable="true" style="top: 68%; left: 40%; cursor: grab;">
+<img class="player-photo" src="https://media.api-sports.io/football/players/47519.png" draggable="false" />
+<div class="player-name">Pedro Porro</div>
+<span class="tooltiptext">Pos: Defender<br>Age: 26<br>Form: 7.345714</span>
+</div><div class="player-node tooltip" draggable="true" style="top: 68%; left: 60%; cursor: grab;">
+<img class="player-photo" src="https://media.api-sports.io/football/players/289.png" draggable="false" />
+<div class="player-name">A. Robertson</div>
+<span class="tooltiptext">Pos: Defender<br>Age: 31<br>Form: 7.447826</span>
+</div><div class="player-node tooltip" draggable="true" style="top: 68%; left: 80%; cursor: grab;">
+<img class="player-photo" src="https://media.api-sports.io/football/players/284230.png" draggable="false" />
+<div class="player-name">R. Lewis</div>
+<span class="tooltiptext">Pos: Defender<br>Age: 21<br>Form: 6.992857</span>
+</div><div class="player-node tooltip" draggable="true" style="top: 88%; left: 50%; cursor: grab;">
+<img class="player-photo" src="https://media.api-sports.io/football/players/19088.png" draggable="false" />
+<div class="player-name">D. Henderson</div>
+<span class="tooltiptext">Pos: Goalkeeper<br>Age: 28<br>Form: 6.85</span>
 </div>
 </div>
+
+<script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+<script>
+let draggedNode = null;
+const nodes = document.querySelectorAll('.player-node');
+nodes.forEach(node => {
+    node.addEventListener('dragstart', (e) => {
+        draggedNode = node;
+        e.dataTransfer.effectAllowed = 'move';
+        node.style.opacity = '0.5';
+    });
+    node.addEventListener('dragend', (e) => {
+        draggedNode = null;
+        node.style.opacity = '1';
+    });
+    node.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        return false;
+    });
+    node.addEventListener('drop', (e) => {
+        e.stopPropagation();
+        if (draggedNode !== node) {
+            const tempTop = draggedNode.style.top;
+            const tempLeft = draggedNode.style.left;
+            draggedNode.style.top = node.style.top;
+            draggedNode.style.left = node.style.left;
+            node.style.top = tempTop;
+            node.style.left = tempLeft;
+        }
+        return false;
+    });
+});
+
+function exportLineup() {
+    html2canvas(document.getElementById("pitch-container"), {backgroundColor: null}).then(canvas => {
+        let link = document.createElement("a");
+        link.download = "lineup.png";
+        link.href = canvas.toDataURL();
+        link.click();
+    });
+}
+</script>
