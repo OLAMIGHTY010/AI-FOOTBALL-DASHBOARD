@@ -1,6 +1,9 @@
 "use client";
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import FPLChat from "./components/FPLChat";
+import FPLLeagues from "./components/FPLLeagues";
+import FPLMatchCenter from "./components/FPLMatchCenter";
 
 const API_URL = "http://localhost:8000";
 
@@ -8,6 +11,7 @@ export default function FPLPage() {
   const [activeTab, setActiveTab] = useState("transfers");
   const [players, setPlayers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [session, setSession] = useState(null);
   
   // Optimizer state
   const [budget, setBudget] = useState(100.0);
@@ -16,8 +20,35 @@ export default function FPLPage() {
   
   // Squad state
   const [squad, setSquad] = useState(null);
+  const [punditReport, setPunditReport] = useState(null);
+  const [reportLoading, setReportLoading] = useState(false);
+
+  const fetchPunditReport = async () => {
+    setReportLoading(true);
+    try {
+      const resStandings = await fetch(`${API_URL}/api/standings`);
+      const standings = await resStandings.json();
+      
+      const res = await fetch(`${API_URL}/api/fpl/analyze`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ standings })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setPunditReport(data.report);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+    setReportLoading(false);
+  };
 
   useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+    });
+
     const fetchFpl = async () => {
       try {
         const res = await fetch(`${API_URL}/api/fpl/data`);
@@ -34,9 +65,26 @@ export default function FPLPage() {
     setSquad(JSON.parse(localStorage.getItem("fpl_squad") || "null"));
   }, []);
 
-  const saveSquadLocally = (newSquad) => {
+  const saveSquadLocally = async (newSquad) => {
     setSquad(newSquad);
     localStorage.setItem("fpl_squad", JSON.stringify(newSquad));
+
+    // Sync to fpl_scores in Supabase
+    if (session) {
+      const gwPoints = newSquad.starting_eleven.reduce((acc, p) => {
+        let pts = p.live_points || 0;
+        if (newSquad.captain && newSquad.captain.id === p.id) pts *= 2;
+        return acc + pts;
+      }, 0);
+
+      await supabase.from("fpl_scores").upsert({
+        user_id: session.user.id,
+        email: session.user.email,
+        total_points: newSquad.total_expected_points + gwPoints,
+        gw_points: gwPoints,
+        updated_at: new Date()
+      });
+    }
   };
 
   const runOptimizer = async () => {
@@ -184,8 +232,13 @@ export default function FPLPage() {
           </div>
           <div className="text-[10px] text-green-400 font-black">£{p.price.toFixed(1)}m</div>
         </div>
-        <div className="text-[9px] text-[var(--text-secondary)] font-bold mt-1 bg-black/60 px-1.5 py-0.5 rounded shadow-sm">
-          Exp: {p.expected_points.toFixed(1)}
+        <div className="flex gap-1 mt-1">
+          <div className="text-[9px] text-[var(--text-secondary)] font-bold bg-black/60 px-1 py-0.5 rounded shadow-sm">
+            Exp: {p.expected_points.toFixed(1)}
+          </div>
+          <div className="text-[9px] text-[var(--accent-primary)] font-bold bg-black/60 px-1 py-0.5 rounded shadow-sm">
+            Live: {p.live_points !== undefined ? p.live_points : "-"}
+          </div>
         </div>
       </div>
     );
@@ -201,15 +254,24 @@ export default function FPLPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 mb-6 max-w-2xl mx-auto">
-        <button onClick={() => setActiveTab("transfers")} className={`flex-1 py-2 rounded font-bold ${activeTab === 'transfers' ? 'bg-[var(--accent-primary)] text-black' : 'bg-[var(--bg-card)]'}`}>
+      <div className="flex flex-wrap justify-center gap-2 mb-6 max-w-4xl mx-auto">
+        <button onClick={() => setActiveTab("transfers")} className={`px-4 py-2 rounded font-bold ${activeTab === 'transfers' ? 'bg-[var(--accent-primary)] text-black' : 'bg-[var(--bg-card)]'}`}>
           🔄 Player Database
         </button>
-        <button onClick={() => setActiveTab("ai")} className={`flex-1 py-2 rounded font-bold ${activeTab === 'ai' ? 'bg-[var(--accent-primary)] text-black' : 'bg-[var(--bg-card)]'}`}>
+        <button onClick={() => setActiveTab("ai")} className={`px-4 py-2 rounded font-bold ${activeTab === 'ai' ? 'bg-[var(--accent-primary)] text-black' : 'bg-[var(--bg-card)]'}`}>
           🤖 AI Optimizer
         </button>
-        <button onClick={() => setActiveTab("team")} className={`flex-1 py-2 rounded font-bold ${activeTab === 'team' ? 'bg-[var(--accent-primary)] text-black' : 'bg-[var(--bg-card)]'}`}>
+        <button onClick={() => setActiveTab("team")} className={`px-4 py-2 rounded font-bold ${activeTab === 'team' ? 'bg-[var(--accent-primary)] text-black' : 'bg-[var(--bg-card)]'}`}>
           👔 My Team
+        </button>
+        <button onClick={() => setActiveTab("matchcenter")} className={`px-4 py-2 rounded font-bold ${activeTab === 'matchcenter' ? 'bg-[var(--accent-primary)] text-black' : 'bg-[var(--bg-card)]'}`}>
+          📅 Match Center
+        </button>
+        <button onClick={() => setActiveTab("leagues")} className={`px-4 py-2 rounded font-bold ${activeTab === 'leagues' ? 'bg-yellow-500 text-black' : 'bg-[var(--bg-card)]'}`}>
+          🏆 Leagues
+        </button>
+        <button onClick={() => setActiveTab("chat")} className={`px-4 py-2 rounded font-bold ${activeTab === 'chat' ? 'bg-purple-500 text-white' : 'bg-[var(--bg-card)]'}`}>
+          💬 FPL Chat
         </button>
       </div>
 
@@ -399,12 +461,52 @@ export default function FPLPage() {
                     <span className="font-bold text-[var(--text-secondary)]">Projected Pts</span>
                     <span className="font-black text-4xl text-[var(--accent-primary)]">{squad.total_expected_points.toFixed(1)}</span>
                   </div>
+                  <div className="flex justify-between items-end mt-4 border-t border-[var(--border-color)] pt-4">
+                    <span className="font-bold text-white">LIVE MATCHWEEK PTS</span>
+                    <span className="font-black text-4xl text-green-400 animate-pulse">
+                      {squad.starting_eleven.reduce((acc, p) => {
+                        let pts = p.live_points || 0;
+                        if (squad.captain && squad.captain.id === p.id) pts *= 2;
+                        return acc + pts;
+                      }, 0)}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="mt-6">
+                  <button 
+                    onClick={fetchPunditReport}
+                    disabled={reportLoading}
+                    className="w-full btn-secondary bg-blue-900/40 hover:bg-blue-800/40 border-blue-500 py-3"
+                  >
+                    {reportLoading ? "Analyzing League..." : "🎙️ Generate Pundit Report"}
+                  </button>
+                  {punditReport && (
+                    <div className="mt-4 p-4 glass-card bg-black/40 border-l-4 border-l-blue-500 text-sm italic text-gray-300">
+                      {punditReport}
+                    </div>
+                  )}
                 </div>
 
               </div>
             </div>
           )}
         </div>
+      )}
+
+      {/* Match Center */}
+      {!loading && activeTab === "matchcenter" && (
+        <FPLMatchCenter />
+      )}
+
+      {/* Leagues */}
+      {!loading && activeTab === "leagues" && (
+        <FPLLeagues session={session} />
+      )}
+
+      {/* Chat */}
+      {!loading && activeTab === "chat" && (
+        <FPLChat session={session} />
       )}
     </div>
   );

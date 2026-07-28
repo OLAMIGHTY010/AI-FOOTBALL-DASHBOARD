@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
 import uuid
+from datetime import datetime
 import random
 
 from data import VIRTUAL_TEAMS
@@ -46,6 +47,34 @@ class PackRequest(BaseModel):
     pack_type: Optional[str] = None
     pack_name: Optional[str] = None
 
+
+
+class MarketListRequest(BaseModel):
+    player: dict
+    price: float
+    seller_id: str
+
+class MarketBuyRequest(BaseModel):
+    listing_id: str
+    buyer_id: str
+
+class SBCSubmitRequest(BaseModel):
+    players: List[dict]
+
+class EvolveRequest(BaseModel):
+    player: dict
+
+
+
+class ParlayRequest(BaseModel):
+    legs: List[dict]
+    wager: float
+
+class UTRecommendRequest(BaseModel):
+    club: List[dict]
+
+class FPLAnalyzeRequest(BaseModel):
+    standings: dict
 
 class FPLOptimizeRequest(BaseModel):
     budget: Optional[float] = 100.0
@@ -117,9 +146,10 @@ def run_simulation(req: SimulateRequest):
     for fixture in current_fixtures:
         home = fixture["home"]
         away = fixture["away"]
-        match_result = simulate_match(home, away)
+        match_result = simulate_match(home, away, fixture.get("weather", "Sunny"))
         match_result["id"] = fixture["id"]
         match_result["odds"] = fixture["odds"]
+        match_result["weather"] = fixture.get("weather", "Sunny")
 
         # Update standings
         league = home["league"]
@@ -157,6 +187,23 @@ def run_simulation(req: SimulateRequest):
     return {"results": results, "next_fixtures": current_fixtures}
 
 
+
+@app.post("/api/bet/parlay")
+def place_parlay(req: ParlayRequest):
+    # Calculate combined odds
+    combined_odds = 1.0
+    for leg in req.legs:
+        combined_odds *= leg.get("odds", 1.0)
+    
+    # In reality, this would just be stored as pending
+    return {
+        "status": "pending",
+        "combined_odds": round(combined_odds, 2),
+        "potential_payout": round(req.wager * combined_odds, 2),
+        "legs": req.legs
+    }
+
+
 @app.post("/api/bet/check")
 def check_bet(bet: BetRequest):
     # This would normally look up a stored match result
@@ -185,6 +232,108 @@ def open_ut_pack(req: Optional[PackRequest] = None):
     }
 
 
+@app.post("/api/ut/recommend")
+def recommend_transfer(req: UTRecommendRequest):
+    club = req.club
+    if not club:
+        return {"success": False, "error": "Club is empty."}
+        
+    # Find weakest player
+    weakest = min(club, key=lambda x: x.get("rating", 99))
+    target_pos = weakest.get("position")
+    
+    global transfer_market_listings
+    # Find affordable upgrades in the market
+    upgrades = []
+    for listing in transfer_market_listings:
+        p = listing["player"]
+        if p.get("position") == target_pos and p.get("rating", 0) > weakest.get("rating", 0):
+            upgrades.append(listing)
+            
+    if not upgrades:
+        return {"success": True, "weakest": weakest, "recommendation": None, "message": f"Your weakest link is {weakest['name']} (Rating: {weakest['rating']}), but no upgrades were found on the market for {target_pos}."}
+        
+    # Recommend the best value upgrade (rating / price)
+    best_value = max(upgrades, key=lambda l: l["player"].get("rating", 0) / max(l["price"], 1))
+    
+    return {
+        "success": True,
+        "weakest": weakest,
+        "recommendation": best_value,
+        "message": f"Your weakest link is {weakest['name']}. We recommend buying {best_value['player']['name']} ({best_value['player']['rating']} OVR) for ${best_value['price']}."
+    }
+
+
+# --- Ultimate Team Transfer Market ---
+transfer_market_listings = []
+
+@app.get("/api/ut/market")
+def get_market():
+    return {"listings": transfer_market_listings}
+
+@app.post("/api/ut/market/list")
+def list_on_market(req: MarketListRequest):
+    listing_id = str(uuid.uuid4())
+    listing = {
+        "id": listing_id,
+        "player": req.player,
+        "price": req.price,
+        "seller_id": req.seller_id,
+        "listed_at": str(datetime.now())
+    }
+    transfer_market_listings.append(listing)
+    return {"success": True, "listing": listing}
+
+@app.post("/api/ut/market/buy")
+def buy_from_market(req: MarketBuyRequest):
+    global transfer_market_listings
+    for listing in transfer_market_listings:
+        if listing["id"] == req.listing_id:
+            # Here we just remove it from the market. 
+            # The frontend deducts balance and adds to club.
+            transfer_market_listings = [l for l in transfer_market_listings if l["id"] != req.listing_id]
+            return {"success": True, "player": listing["player"], "seller_id": listing["seller_id"], "price": listing["price"]}
+    raise HTTPException(status_code=404, detail="Listing not found or already sold")
+
+# --- Ultimate Team SBC ---
+@app.post("/api/ut/sbc/submit")
+def submit_sbc(req: SBCSubmitRequest):
+    if len(req.players) != 11:
+        return {"success": False, "error": "SBC requires exactly 11 players."}
+    
+    # Calculate Team Rating
+    avg_rating = sum(p.get("rating", 0) for p in req.players) / 11.0
+    if avg_rating < 75:
+        return {"success": False, "error": f"Squad rating too low (Required: 75+, Provided: {avg_rating:.1f})"}
+    
+    # Check max players from same club constraint (e.g. max 3)
+    clubs = {}
+    for p in req.players:
+        team = p.get("team", "Unknown")
+        clubs[team] = clubs.get(team, 0) + 1
+        if clubs[team] > 3:
+            return {"success": False, "error": "Max 3 players from the same club allowed."}
+    
+    # Give reward
+    reward_cards = open_pack("gold")
+    return {"success": True, "reward": reward_cards, "pack_name": "SBC Gold Reward"}
+
+# --- Ultimate Team Evolutions ---
+@app.post("/api/ut/evolve")
+def evolve_player(req: EvolveRequest):
+    p = req.player
+    # Add +3 to rating
+    p["rating"] = p.get("rating", 60) + 3
+    p["name"] = p.get("name", "Player") + " 🌟"
+    p["is_evolved"] = True
+    # If silver/bronze and rating >= 80, bump rarity
+    if p["rating"] >= 80 and p.get("rarity") in ["Bronze", "Silver"]:
+        p["rarity"] = "Gold"
+    return {"success": True, "player": p}
+
+
+
+
 # --- FPL Endpoints ---
 @app.get("/api/fpl/data")
 def get_fpl_player_data():
@@ -198,6 +347,34 @@ def optimize_fpl(req: Optional[FPLOptimizeRequest] = None):
     formation = req.formation if req and req.formation is not None else "3-4-3"
     result = optimize_fpl_squad(budget=budget, max_per_team=max_per_team, formation=formation)
     return result
+
+
+
+@app.post("/api/fpl/analyze")
+def fpl_analyze(req: FPLAnalyzeRequest):
+    standings = req.standings
+    if not standings:
+        return {"success": False, "error": "No standings data provided."}
+        
+    # Analyze the standings dictionary
+    # Assuming standings maps team_name to a dictionary of stats including 'Pts' and 'GD'
+    teams = []
+    for league, league_teams in standings.items():
+        for t_name, t_stats in league_teams.items():
+            teams.append({"name": t_name, "pts": t_stats.get("Pts", 0), "gd": t_stats.get("GD", 0)})
+            
+    if not teams:
+        return {"success": False, "error": "Standings empty."}
+        
+    # Sort teams by points desc
+    teams.sort(key=lambda x: (x["pts"], x["gd"]), reverse=True)
+    
+    top_team = teams[0]
+    bottom_team = teams[-1]
+    
+    report = f"🎙️ **Pundit Report**: What a gameweek! **{top_team['name']}** is absolutely flying at the top with {top_team['pts']} points. They look unstoppable right now. On the other hand, serious questions need to be asked about **{bottom_team['name']}**. Rooted to the bottom with just {bottom_team['pts']} points... the manager's seat must be getting hot! They need a tactical rethink immediately."
+    
+    return {"success": True, "report": report}
 
 
 # --- Tactics Endpoints ---

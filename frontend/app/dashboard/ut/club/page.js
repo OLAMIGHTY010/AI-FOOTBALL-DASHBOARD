@@ -3,6 +3,8 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 
+const API_URL = "http://localhost:8000";
+
 export default function MyClubPage() {
   const [club, setClub] = useState([]);
 
@@ -25,6 +27,34 @@ export default function MyClubPage() {
     const { data: { session } } = await supabase.auth.getSession();
     if (session) {
       await supabase.from("wallets").update({ balance: currentBankroll }).eq("user_id", session.user.id);
+    }
+  };
+
+  const listOnMarket = async (index, card) => {
+    const price = prompt(`Enter listing price for ${card.name} (Min $${card.sell_value}):`, (card.sell_value * 2).toString());
+    if (!price || isNaN(price)) return;
+    const numPrice = parseFloat(price);
+    
+    const { data: { session } } = await supabase.auth.getSession();
+    const seller_id = session ? session.user.id : "guest_" + Math.random().toString(36).substr(2, 9);
+    
+    try {
+      const res = await fetch(`${API_URL}/api/ut/market/list`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ player: card, price: numPrice, seller_id })
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert("Listed on market!");
+        const newClub = [...club];
+        newClub.splice(index, 1);
+        setClub(newClub);
+        localStorage.setItem("my_club", JSON.stringify(newClub));
+      }
+    } catch (e) {
+      console.error(e);
+      alert("Failed to list on market");
     }
   };
 
@@ -74,11 +104,17 @@ export default function MyClubPage() {
                 <div className="text-xs font-semibold opacity-75">{card.team}</div>
               </div>
               
-              {/* Overlay for quick sell */}
-              <div className="absolute inset-0 bg-black/80 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-lg">
+              {/* Overlay for quick sell & list */}
+              <div className="absolute inset-0 bg-black/80 flex flex-col items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg">
+                <button 
+                  onClick={() => listOnMarket(index, card)}
+                  className="bg-blue-600 text-white font-bold py-1 px-3 rounded-full text-sm hover:bg-blue-500 w-3/4"
+                >
+                  List on Market
+                </button>
                 <button 
                   onClick={() => sellCard(index, card.sell_value)}
-                  className="bg-red-500 text-white font-bold py-1 px-3 rounded-full text-sm hover:bg-red-400"
+                  className="bg-red-500 text-white font-bold py-1 px-3 rounded-full text-sm hover:bg-red-400 w-3/4"
                 >
                   Quick Sell (${card.sell_value})
                 </button>

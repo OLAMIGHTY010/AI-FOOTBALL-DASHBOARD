@@ -1,6 +1,14 @@
 import random
 from data import VIRTUAL_TEAMS
 
+TEAM_PENALTIES = {
+    league: {team: {"injuries": 0, "suspensions": 0} for team in teams}
+    for league, teams in VIRTUAL_TEAMS.items()
+}
+
+def generate_weather():
+    return random.choices(["Sunny", "Rain", "Snow"], weights=[0.6, 0.3, 0.1])[0]
+
 
 def calculate_all_odds(h_team, a_team):
     """Calculate all betting odds for a match."""
@@ -114,13 +122,21 @@ def calculate_live_odds(h_team, a_team, h_goals, a_goals, minute):
 
 def generate_fixtures():
     """Generate a full matchweek of fixtures for every league."""
+    for l in TEAM_PENALTIES:
+        for t in TEAM_PENALTIES[l]:
+            if TEAM_PENALTIES[l][t]["injuries"] > 0: TEAM_PENALTIES[l][t]["injuries"] -= 1
+            if TEAM_PENALTIES[l][t]["suspensions"] > 0: TEAM_PENALTIES[l][t]["suspensions"] -= 1
+
     fixtures = []
     match_id_counter = 1
     for league, teams in VIRTUAL_TEAMS.items():
-        league_teams = [
-            {"name": t, "league": league, "power": v["power"], "star": v["star"]}
-            for t, v in teams.items()
-        ]
+        league_teams = []
+        for t, v in teams.items():
+            power = v["power"]
+            pen = TEAM_PENALTIES[league][t]
+            power -= (pen["injuries"] * 5) + (pen["suspensions"] * 3)
+            league_teams.append({"name": t, "league": league, "power": max(10, power), "star": v["star"]})
+
         random.shuffle(league_teams)
         for i in range(0, len(league_teams), 2):
             if i + 1 < len(league_teams):
@@ -131,12 +147,13 @@ def generate_fixtures():
                     "home": t1,
                     "away": t2,
                     "odds": calculate_all_odds(t1, t2),
+                    "weather": generate_weather()
                 })
                 match_id_counter += 1
     return fixtures
 
 
-def simulate_match(home_team, away_team):
+def simulate_match(home_team, away_team, weather='Sunny'):
     """Simulate a full 90-minute match and return the result."""
     match = {
         "home": home_team,
@@ -150,11 +167,20 @@ def simulate_match(home_team, away_team):
         "events": [],
     }
 
-    h_chance = (home_team["power"] / 90.0) * 0.02
-    a_chance = (away_team["power"] / 90.0) * 0.02
-    corner_chance = (home_team["power"] + away_team["power"]) / 180.0 * 0.12
     power_diff = abs(home_team["power"] - away_team["power"])
-    foul_chance = (1.0 - (power_diff / 50.0)) * 0.25
+    weather_mod = 1.0
+    foul_mod = 1.0
+    if weather == 'Rain':
+        foul_mod = 1.3
+        weather_mod = 0.9
+    elif weather == 'Snow':
+        weather_mod = 0.7
+        foul_mod = 1.1
+
+    h_chance = ((home_team["power"] / 90.0) * 0.02) * weather_mod
+    a_chance = ((away_team["power"] / 90.0) * 0.02) * weather_mod
+    corner_chance = ((home_team["power"] + away_team["power"]) / 180.0 * 0.12) * weather_mod
+    foul_chance = ((1.0 - (power_diff / 50.0)) * 0.25) * foul_mod
 
     def get_scorer(star_name):
         if random.random() < 0.4:
@@ -172,14 +198,14 @@ def simulate_match(home_team, away_team):
             scorer = get_scorer(home_team["star"])
             if scorer == home_team["star"]:
                 match["h_star_scored"] = True
-            match["events"].append({"minute": minute, "type": "goal", "team": "home", "player": scorer})
+            match["events"].append({"minute": minute, "type": "goal", "team": "home", "player": scorer, "x": random.randint(85, 95), "y": random.randint(40, 60)})
 
         if random.random() < a_chance:
             match["a_goals"] += 1
             scorer = get_scorer(away_team["star"])
             if scorer == away_team["star"]:
                 match["a_star_scored"] = True
-            match["events"].append({"minute": minute, "type": "goal", "team": "away", "player": scorer})
+            match["events"].append({"minute": minute, "type": "goal", "team": "away", "player": scorer, "x": random.randint(5, 15), "y": random.randint(40, 60)})
 
         # Corners
         if random.random() < corner_chance:
@@ -188,7 +214,9 @@ def simulate_match(home_team, away_team):
                 match["h_corners"] += 1
             else:
                 match["a_corners"] += 1
-            match["events"].append({"minute": minute, "type": "corner", "team": side})
+            x_coord = 100 if side == "home" else 0
+            y_coord = random.choice([0, 100])
+            match["events"].append({"minute": minute, "type": "corner", "team": side, "x": x_coord, "y": y_coord})
 
         # Fouls & Cards
         if random.random() < foul_chance:
@@ -197,18 +225,30 @@ def simulate_match(home_team, away_team):
                 match["h_fouls"] += 1
             else:
                 match["a_fouls"] += 1
-            match["events"].append({"minute": minute, "type": "foul", "team": side})
+            match["events"].append({"minute": minute, "type": "foul", "team": side, "x": random.randint(20, 80), "y": random.randint(10, 90)})
 
             if random.random() < 0.15:
                 if random.random() < 0.05 and not match["red_card"]:
                     match["red_card"] = True
-                    match["events"].append({"minute": minute, "type": "red_card", "team": side})
+                    match["events"].append({"minute": minute, "type": "red_card", "team": side, "x": random.randint(20, 80), "y": random.randint(10, 90)})
+                    # apply suspension
+                    team_name = home_team["name"] if side == "home" else away_team["name"]
+                    league_name = home_team["league"]
+                    TEAM_PENALTIES[league_name][team_name]["suspensions"] = 1
                 else:
                     if side == "home":
                         match["h_yellows"] += 1
                     else:
                         match["a_yellows"] += 1
-                    match["events"].append({"minute": minute, "type": "yellow_card", "team": side})
+                    match["events"].append({"minute": minute, "type": "yellow_card", "team": side, "x": random.randint(20, 80), "y": random.randint(10, 90)})
+            
+            # Injury chance on fouls
+            if random.random() < 0.02:
+                injured_side = "away" if side == "home" else "home"
+                match["events"].append({"minute": minute, "type": "injury", "team": injured_side, "x": random.randint(20, 80), "y": random.randint(10, 90)})
+                team_name = home_team["name"] if injured_side == "home" else away_team["name"]
+                league_name = home_team["league"]
+                TEAM_PENALTIES[league_name][team_name]["injuries"] = 2
 
     return match
 

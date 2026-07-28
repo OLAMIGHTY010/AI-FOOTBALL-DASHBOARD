@@ -89,9 +89,18 @@ export default function PackStorePage() {
         <p className="text-[var(--text-secondary)] mb-4">
           Spend your Sportsbook winnings on packs. Build your ultimate squad!
         </p>
-        <div className="flex justify-center gap-4">
+        <div className="flex flex-wrap justify-center gap-4">
           <Link href="/dashboard/ut/club" className="btn-secondary px-6">
             View My Club 🏟️
+          </Link>
+          <Link href="/dashboard/ut/market" className="btn-secondary px-6 bg-blue-900/40 hover:bg-blue-800/40 border-blue-500">
+            Transfer Market 💸
+          </Link>
+          <Link href="/dashboard/ut/sbc" className="btn-secondary px-6 bg-purple-900/40 hover:bg-purple-800/40 border-purple-500">
+            SBCs 🧩
+          </Link>
+          <Link href="/dashboard/ut/evolutions" className="btn-secondary px-6 bg-green-900/40 hover:bg-green-800/40 border-green-500">
+            Evolutions 🧬
           </Link>
           <Link href="/dashboard/ut/pvp" className="btn-primary px-6">
             Multiplayer PvP 🌐

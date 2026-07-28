@@ -108,6 +108,19 @@ export default function SportsbookPage() {
       return;
     }
     
+    // API Call for Phase 3 Parlay
+    if (betSlip.length > 1) {
+      try {
+        await fetch(`${API_URL}/api/bet/parlay`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ legs: betSlip, wager: parseFloat(wager) })
+        });
+      } catch (e) {
+        console.error("Failed to register parlay on backend", e);
+      }
+    }
+    
     const newBankroll = bankroll - wager;
     localStorage.setItem("bankroll", newBankroll.toString());
     

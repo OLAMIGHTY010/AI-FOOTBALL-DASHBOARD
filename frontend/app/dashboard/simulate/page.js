@@ -5,6 +5,34 @@ import { getMarketLabel } from "@/lib/utils";
 
 const API_URL = "http://localhost:8000";
 
+const INITIAL_HOME_PLAYERS = [
+  { id: 'h1', base_x: 8, base_y: 50 },
+  { id: 'h2', base_x: 20, base_y: 20 },
+  { id: 'h3', base_x: 18, base_y: 40 },
+  { id: 'h4', base_x: 18, base_y: 60 },
+  { id: 'h5', base_x: 20, base_y: 80 },
+  { id: 'h6', base_x: 35, base_y: 25 },
+  { id: 'h7', base_x: 32, base_y: 42 },
+  { id: 'h8', base_x: 32, base_y: 58 },
+  { id: 'h9', base_x: 35, base_y: 75 },
+  { id: 'h10', base_x: 45, base_y: 40 },
+  { id: 'h11', base_x: 45, base_y: 60 }
+];
+
+const INITIAL_AWAY_PLAYERS = [
+  { id: 'a1', base_x: 92, base_y: 50 },
+  { id: 'a2', base_x: 80, base_y: 20 },
+  { id: 'a3', base_x: 82, base_y: 40 },
+  { id: 'a4', base_x: 82, base_y: 60 },
+  { id: 'a5', base_x: 80, base_y: 80 },
+  { id: 'a6', base_x: 65, base_y: 25 },
+  { id: 'a7', base_x: 68, base_y: 42 },
+  { id: 'a8', base_x: 68, base_y: 58 },
+  { id: 'a9', base_x: 65, base_y: 75 },
+  { id: 'a10', base_x: 55, base_y: 40 },
+  { id: 'a11', base_x: 55, base_y: 60 }
+];
+
 const GENERATE_COMMENTARY = (home, away, minute) => {
   const actions = [
     `Patient build-up play by ${home}.`,
@@ -35,6 +63,7 @@ export default function SimulatePage() {
   const [featuredMatchId, setFeaturedMatchId] = useState(null);
   const [ballPos, setBallPos] = useState({ x: 50, y: 50 });
   const [overlayMsg, setOverlayMsg] = useState(null);
+  const [pitchPlayers, setPitchPlayers] = useState({ home: INITIAL_HOME_PLAYERS, away: INITIAL_AWAY_PLAYERS });
 
   const fetchStandings = async () => {
     try {
@@ -53,6 +82,27 @@ export default function SimulatePage() {
     setSettledBets(JSON.parse(localStorage.getItem("settled_bets") || "[]"));
     fetchStandings();
   }, []);
+
+  // Dynamic Player Movement Effect
+  useEffect(() => {
+    if (!isLive) return;
+    const applyMovement = (players) => {
+      return players.map(p => {
+        let dx = (Math.random() - 0.5) * 6; // slightly bigger jitter
+        let dy = (Math.random() - 0.5) * 6;
+        const distToBall = Math.hypot(ballPos.x - p.base_x, ballPos.y - p.base_y);
+        if (distToBall < 40 && p.id !== 'h1' && p.id !== 'a1') { // don't move GKs towards ball
+          dx += (ballPos.x - p.base_x) * 0.15;
+          dy += (ballPos.y - p.base_y) * 0.15;
+        }
+        return { ...p, current_x: p.base_x + dx, current_y: p.base_y + dy };
+      });
+    };
+    setPitchPlayers({
+      home: applyMovement(INITIAL_HOME_PLAYERS),
+      away: applyMovement(INITIAL_AWAY_PLAYERS)
+    });
+  }, [currentMinute, ballPos, isLive]);
 
   // Timer effect
   useEffect(() => {
@@ -100,29 +150,22 @@ export default function SimulatePage() {
       if (featuredMatchId) {
         if (featuredEvent) {
           if (featuredEvent.type === "goal") {
-            // Home is left, Away is right.
-            // Home scores -> Ball goes into Right net (x:95%)
-            if (featuredEvent.team === "home") {
-              setBallPos({ x: 97, y: 50 });
-            } else {
-              setBallPos({ x: 3, y: 50 });
-            }
+            setBallPos({ x: featuredEvent.x || (featuredEvent.team === "home" ? 97 : 3), y: featuredEvent.y || 50 });
             triggerOverlay("⚽ GOAL!");
           } else if (featuredEvent.type === "red_card") {
+            if (featuredEvent.x) setBallPos({ x: featuredEvent.x, y: featuredEvent.y });
             triggerOverlay("🟥 RED CARD!");
-            randomMidfieldPass();
           } else if (featuredEvent.type === "yellow_card") {
+            if (featuredEvent.x) setBallPos({ x: featuredEvent.x, y: featuredEvent.y });
             triggerOverlay("🟨 YELLOW CARD");
-            randomMidfieldPass();
           } else if (featuredEvent.type === "corner") {
-            if (featuredEvent.team === "home") {
-              setBallPos({ x: 98, y: Math.random() > 0.5 ? 2 : 98 });
-            } else {
-              setBallPos({ x: 2, y: Math.random() > 0.5 ? 2 : 98 });
-            }
+            setBallPos({ x: featuredEvent.x || (featuredEvent.team === "home" ? 98 : 2), y: featuredEvent.y || 2 });
           } else if (featuredEvent.type === "foul") {
+            if (featuredEvent.x) setBallPos({ x: featuredEvent.x, y: featuredEvent.y });
             triggerOverlay("🦵 FOUL");
-            randomMidfieldPass();
+          } else if (featuredEvent.type === "injury") {
+            if (featuredEvent.x) setBallPos({ x: featuredEvent.x, y: featuredEvent.y });
+            triggerOverlay("🤕 INJURY!");
           }
         } else {
           // No event, just pass around
@@ -536,7 +579,10 @@ export default function SimulatePage() {
             
             <div className="glass-card bg-gradient-to-b from-black to-[#0a0a0a] border border-[var(--border-color)] p-0 overflow-hidden rounded-xl">
               {/* Scoreboard Header */}
-              <div className="flex justify-between items-center p-4 bg-black/60 border-b border-white/10">
+              <div className="flex justify-between items-center p-4 bg-black/60 border-b border-white/10 relative">
+                <div className="absolute top-2 left-4 text-xs font-bold text-[var(--text-secondary)]">
+                  WEATHER: {featuredMatch.weather === "Rain" ? "🌧️ RAIN" : featuredMatch.weather === "Snow" ? "❄️ SNOW" : "☀️ SUNNY"}
+                </div>
                 <div className="flex-1 text-right font-black text-xl md:text-2xl">{featuredMatch.home.name}</div>
                 <div className="px-6 py-2 bg-black rounded-lg border border-[var(--accent-primary)] mx-4">
                   <span className="text-3xl font-black gradient-text">
@@ -547,9 +593,12 @@ export default function SimulatePage() {
               </div>
 
               {/* Pitch Container */}
-              <div className="relative w-full h-[300px] md:h-[400px] bg-gradient-to-r from-[#1b4d2e] via-[#225c38] to-[#1b4d2e] overflow-hidden">
+              <div className={`relative w-full h-[300px] md:h-[400px] overflow-hidden ${featuredMatch.weather === 'Snow' ? 'bg-gradient-to-r from-[#d9d9d9] via-[#f0f0f0] to-[#d9d9d9]' : 'bg-gradient-to-r from-[#1b4d2e] via-[#225c38] to-[#1b4d2e]'}`}>
                 {/* Grass Stripes Pattern via CSS linear-gradient */}
-                <div className="absolute inset-0 opacity-20" style={{ background: 'repeating-linear-gradient(to right, transparent, transparent 10%, rgba(255,255,255,0.1) 10%, rgba(255,255,255,0.1) 20%)' }}></div>
+                {featuredMatch.weather !== 'Snow' && <div className="absolute inset-0 opacity-20" style={{ background: 'repeating-linear-gradient(to right, transparent, transparent 10%, rgba(255,255,255,0.1) 10%, rgba(255,255,255,0.1) 20%)' }}></div>}
+                
+                {/* Weather Overlay Effect */}
+                {featuredMatch.weather === 'Rain' && <div className="absolute inset-0 opacity-40 pointer-events-none" style={{ backgroundImage: "url(\"data:image/svg+xml;utf8,<svg viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'><line x1='10' y1='0' x2='0' y2='100' stroke='rgba(255,255,255,0.2)' stroke-width='1'/></svg>\")", backgroundSize: "20px 20px" }}></div>}
                 
                 {/* Field Markings */}
                 <div className="absolute top-4 bottom-4 left-4 right-4 border-2 border-white/40 pointer-events-none"></div>
@@ -570,39 +619,15 @@ export default function SimulatePage() {
                 {/* Right Goal Area */}
                 <div className="absolute top-1/2 -translate-y-1/2 right-4 w-1/12 h-1/4 border-2 border-r-0 border-white/40 pointer-events-none"></div>
 
-                {/* Home Team (Left Side - 4-4-2) */}
-                {/* GK */}
-                <div className="absolute left-[8%] top-[50%] -translate-x-1/2 -translate-y-1/2 w-4 h-4 bg-blue-500 rounded-full border border-white shadow-lg pointer-events-none"></div>
-                {/* DEF */}
-                <div className="absolute left-[20%] top-[20%] -translate-x-1/2 -translate-y-1/2 w-4 h-4 bg-blue-500 rounded-full border border-white shadow-lg pointer-events-none"></div>
-                <div className="absolute left-[18%] top-[40%] -translate-x-1/2 -translate-y-1/2 w-4 h-4 bg-blue-500 rounded-full border border-white shadow-lg pointer-events-none"></div>
-                <div className="absolute left-[18%] top-[60%] -translate-x-1/2 -translate-y-1/2 w-4 h-4 bg-blue-500 rounded-full border border-white shadow-lg pointer-events-none"></div>
-                <div className="absolute left-[20%] top-[80%] -translate-x-1/2 -translate-y-1/2 w-4 h-4 bg-blue-500 rounded-full border border-white shadow-lg pointer-events-none"></div>
-                {/* MID */}
-                <div className="absolute left-[35%] top-[25%] -translate-x-1/2 -translate-y-1/2 w-4 h-4 bg-blue-500 rounded-full border border-white shadow-lg pointer-events-none"></div>
-                <div className="absolute left-[32%] top-[42%] -translate-x-1/2 -translate-y-1/2 w-4 h-4 bg-blue-500 rounded-full border border-white shadow-lg pointer-events-none"></div>
-                <div className="absolute left-[32%] top-[58%] -translate-x-1/2 -translate-y-1/2 w-4 h-4 bg-blue-500 rounded-full border border-white shadow-lg pointer-events-none"></div>
-                <div className="absolute left-[35%] top-[75%] -translate-x-1/2 -translate-y-1/2 w-4 h-4 bg-blue-500 rounded-full border border-white shadow-lg pointer-events-none"></div>
-                {/* FWD */}
-                <div className="absolute left-[45%] top-[40%] -translate-x-1/2 -translate-y-1/2 w-4 h-4 bg-blue-500 rounded-full border border-white shadow-lg pointer-events-none"></div>
-                <div className="absolute left-[45%] top-[60%] -translate-x-1/2 -translate-y-1/2 w-4 h-4 bg-blue-500 rounded-full border border-white shadow-lg pointer-events-none"></div>
+                {/* Home Team */}
+                {pitchPlayers.home.map(p => (
+                  <div key={p.id} className="absolute w-4 h-4 bg-blue-500 rounded-full border border-white shadow-lg pointer-events-none transition-all duration-1000 ease-in-out" style={{ left: `${p.current_x ?? p.base_x}%`, top: `${p.current_y ?? p.base_y}%`, transform: 'translate(-50%, -50%)' }}></div>
+                ))}
 
-                {/* Away Team (Right Side - 4-4-2) */}
-                {/* GK */}
-                <div className="absolute right-[8%] top-[50%] translate-x-1/2 -translate-y-1/2 w-4 h-4 bg-red-500 rounded-full border border-white shadow-lg pointer-events-none"></div>
-                {/* DEF */}
-                <div className="absolute right-[20%] top-[20%] translate-x-1/2 -translate-y-1/2 w-4 h-4 bg-red-500 rounded-full border border-white shadow-lg pointer-events-none"></div>
-                <div className="absolute right-[18%] top-[40%] translate-x-1/2 -translate-y-1/2 w-4 h-4 bg-red-500 rounded-full border border-white shadow-lg pointer-events-none"></div>
-                <div className="absolute right-[18%] top-[60%] translate-x-1/2 -translate-y-1/2 w-4 h-4 bg-red-500 rounded-full border border-white shadow-lg pointer-events-none"></div>
-                <div className="absolute right-[20%] top-[80%] translate-x-1/2 -translate-y-1/2 w-4 h-4 bg-red-500 rounded-full border border-white shadow-lg pointer-events-none"></div>
-                {/* MID */}
-                <div className="absolute right-[35%] top-[25%] translate-x-1/2 -translate-y-1/2 w-4 h-4 bg-red-500 rounded-full border border-white shadow-lg pointer-events-none"></div>
-                <div className="absolute right-[32%] top-[42%] translate-x-1/2 -translate-y-1/2 w-4 h-4 bg-red-500 rounded-full border border-white shadow-lg pointer-events-none"></div>
-                <div className="absolute right-[32%] top-[58%] translate-x-1/2 -translate-y-1/2 w-4 h-4 bg-red-500 rounded-full border border-white shadow-lg pointer-events-none"></div>
-                <div className="absolute right-[35%] top-[75%] translate-x-1/2 -translate-y-1/2 w-4 h-4 bg-red-500 rounded-full border border-white shadow-lg pointer-events-none"></div>
-                {/* FWD */}
-                <div className="absolute right-[45%] top-[40%] translate-x-1/2 -translate-y-1/2 w-4 h-4 bg-red-500 rounded-full border border-white shadow-lg pointer-events-none"></div>
-                <div className="absolute right-[45%] top-[60%] translate-x-1/2 -translate-y-1/2 w-4 h-4 bg-red-500 rounded-full border border-white shadow-lg pointer-events-none"></div>
+                {/* Away Team */}
+                {pitchPlayers.away.map(p => (
+                  <div key={p.id} className="absolute w-4 h-4 bg-red-500 rounded-full border border-white shadow-lg pointer-events-none transition-all duration-1000 ease-in-out" style={{ left: `${p.current_x ?? p.base_x}%`, top: `${p.current_y ?? p.base_y}%`, transform: 'translate(-50%, -50%)' }}></div>
+                ))}
 
                 {/* Animated Ball */}
                 <div 

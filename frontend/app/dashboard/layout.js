@@ -14,6 +14,9 @@ const NAV_ITEMS = [
   { href: "/dashboard/history", label: "📜 Bet History", id: "history" },
   { href: "/dashboard/ut", label: "🎴 Ultimate Team", id: "ut" },
   { href: "/dashboard/fpl", label: "🦁 FPL", id: "fpl" },
+  { href: "/dashboard/leaderboards", label: "🌍 Leaderboards", id: "leaderboards" },
+  { href: "/dashboard/chat", label: "💬 Chat", id: "chat" },
+  { href: "/dashboard/profile", label: "👤 Profile", id: "profile" },
 ];
 
 export default function DashboardLayout({ children }) {

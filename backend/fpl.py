@@ -34,6 +34,7 @@ def get_fpl_data() -> List[Dict[str, Any]]:
                         "position": pos_map.get(p["element_type"], "Unknown"),
                         "price": p["now_cost"] / 10.0,
                         "expected_points": ep,
+                        "live_points": p.get("event_points", 0),
                         "form": p["form"],
                         "selected_by": p["selected_by_percent"],
                         "photo": photo_url,
