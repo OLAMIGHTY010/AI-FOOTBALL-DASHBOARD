@@ -6,17 +6,13 @@ import { supabase } from "@/lib/supabaseClient";
 const API_URL = "http://localhost:8000";
 
 const NAV_ITEMS = [
-  { href: "/dashboard", label: "🏠 Dashboard", id: "dashboard" },
-  { href: "/dashboard/sportsbook", label: "📊 Sportsbook", id: "sportsbook" },
-  { href: "/dashboard/simulate", label: "⚽ Simulate", id: "simulate" },
-  { href: "/dashboard/standings", label: "🏆 Standings", id: "standings" },
-  { href: "/dashboard/tactics", label: "👔 Tactics", id: "tactics" },
-  { href: "/dashboard/history", label: "📜 Bet History", id: "history" },
-  { href: "/dashboard/ut", label: "🎴 Ultimate Team", id: "ut" },
-  { href: "/dashboard/fpl", label: "🦁 FPL", id: "fpl" },
-  { href: "/dashboard/leaderboards", label: "🌍 Leaderboards", id: "leaderboards" },
-  { href: "/dashboard/chat", label: "💬 Chat", id: "chat" },
-  { href: "/dashboard/profile", label: "👤 Profile", id: "profile" },
+  { href: "/dashboard", label: "Dashboard", id: "dashboard" },
+  { href: "/dashboard/simulate", label: "Virtual Hub", id: "virtual" },
+  { href: "/dashboard/ut", label: "Ultimate Team", id: "ut" },
+  { href: "/dashboard/fpl", label: "FPL Hub", id: "fpl" },
+  { href: "/dashboard/leaderboards", label: "Global Ranks", id: "leaderboards" },
+  { href: "/dashboard/chat", label: "Global Chat", id: "chat" },
+  { href: "/dashboard/profile", label: "Profile", id: "profile" },
 ];
 
 export default function DashboardLayout({ children }) {

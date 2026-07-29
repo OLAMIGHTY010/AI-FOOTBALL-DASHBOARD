@@ -3,7 +3,6 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import FPLChat from "./components/FPLChat";
 import FPLLeagues from "./components/FPLLeagues";
-import FPLMatchCenter from "./components/FPLMatchCenter";
 
 const API_URL = "http://localhost:8000";
 
@@ -264,9 +263,6 @@ export default function FPLPage() {
         <button onClick={() => setActiveTab("team")} className={`px-4 py-2 rounded font-bold ${activeTab === 'team' ? 'bg-[var(--accent-primary)] text-black' : 'bg-[var(--bg-card)]'}`}>
           👔 My Team
         </button>
-        <button onClick={() => setActiveTab("matchcenter")} className={`px-4 py-2 rounded font-bold ${activeTab === 'matchcenter' ? 'bg-[var(--accent-primary)] text-black' : 'bg-[var(--bg-card)]'}`}>
-          📅 Match Center
-        </button>
         <button onClick={() => setActiveTab("leagues")} className={`px-4 py-2 rounded font-bold ${activeTab === 'leagues' ? 'bg-yellow-500 text-black' : 'bg-[var(--bg-card)]'}`}>
           🏆 Leagues
         </button>
@@ -492,11 +488,6 @@ export default function FPLPage() {
             </div>
           )}
         </div>
-      )}
-
-      {/* Match Center */}
-      {!loading && activeTab === "matchcenter" && (
-        <FPLMatchCenter />
       )}
 
       {/* Leagues */}

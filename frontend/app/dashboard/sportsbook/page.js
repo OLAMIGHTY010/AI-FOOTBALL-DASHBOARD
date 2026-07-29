@@ -1,11 +1,25 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useState, useEffect } from "react";
+import VirtualTabs from "../components/VirtualTabs";
 import { supabase } from "@/lib/supabaseClient";
 import { MARKET_LABELS, getMarketLabel } from "@/lib/utils";
 
 const API_URL = "http://localhost:8000";
 
-export default function SportsbookPage() {
+export default function SportsbookPageWrapper() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <SportsbookPage />
+    </Suspense>
+  );
+}
+
+function SportsbookPage() {
+  const searchParams = useSearchParams();
+  const currentSport = searchParams.get("sport") || "football";
+  const apiEndpoint = currentSport === "basketball" ? `${API_URL}/api/fixtures/basketball` : currentSport === "tennis" ? `${API_URL}/api/fixtures/tennis` : `${API_URL}/api/fixtures`;
+
   const [fixtures, setFixtures] = useState([]);
   const [loading, setLoading] = useState(true);
   const [betSlip, setBetSlip] = useState([]);
@@ -42,8 +56,13 @@ export default function SportsbookPage() {
   const fetchFixtures = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${API_URL}/api/fixtures`);
-      const data = await res.json();
+      const res = await fetch(apiEndpoint);
+      let data = await res.json();
+      
+      if (data && data.fixtures) {
+        data = data.fixtures;
+      }
+      
       setFixtures(data);
       const uniqueLeagues = [...new Set(data.map((f) => f.home.league))];
       setLeagues(uniqueLeagues);
@@ -172,9 +191,17 @@ export default function SportsbookPage() {
     : fixtures.filter((f) => f.home.league === selectedLeague);
 
   return (
-    <div className="flex gap-6 animate-fade-in">
+    <div className="flex gap-6 animate-fade-in flex-col lg:flex-row pb-20">
       {/* Main Content */}
       <div className="flex-1 min-w-0">
+        
+        <div className="text-center mb-8">
+          <h1 className="text-4xl font-black mb-2 uppercase tracking-tight">Virtual Hub</h1>
+          <p className="text-[var(--text-secondary)]">Advanced neural networks predict match outcomes. Build your slip and beat the house.</p>
+        </div>
+
+        <VirtualTabs />
+
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-3xl font-bold mb-2">📊 Sportsbook</h1>
@@ -263,16 +290,16 @@ export default function SportsbookPage() {
                   </div>
                 </div>
 
-                {/* 1X2 Odds */}
-                <div className="grid grid-cols-3 gap-2 mb-2">
-                  {["1", "X", "2"].map((m) => (
+                {/* 1X2 Odds (or Moneyline for Basketball/Tennis) */}
+                <div className={`grid ${currentSport === 'basketball' || currentSport === 'tennis' ? 'grid-cols-2' : 'grid-cols-3'} gap-2 mb-2`}>
+                  {(currentSport === 'basketball' || currentSport === 'tennis' ? ["1", "2"] : ["1", "X", "2"]).map((m) => (
                     <button
                       key={m}
                       onClick={() => addToBetSlip(fixture, m, fixture.odds[m])}
                       className={`odds-btn ${isSelected(fixture.id, m) ? "selected" : ""}`}
                     >
                       <div className="text-[10px] text-[var(--text-secondary)] mb-0.5">
-                        {MARKET_LABELS[m]}
+                        {currentSport === 'basketball' ? (m === "1" ? "Home Win" : "Away Win") : currentSport === 'tennis' ? (m === "1" ? "Home Win" : "Away Win") : MARKET_LABELS[m]}
                       </div>
                       {fixture.odds[m]}
                     </button>
@@ -284,15 +311,20 @@ export default function SportsbookPage() {
                   <summary className="text-xs text-[var(--text-secondary)] cursor-pointer hover:text-[var(--accent-primary)]">
                     + More Markets
                   </summary>
-                  <div className="grid grid-cols-4 gap-2 mt-2">
-                    {["O2.5", "U2.5", "BTTS_Y", "BTTS_N", "1X", "X2", "C_O9.5", "C_U9.5", "Y_O3.5", "Y_U3.5", "RED_Y", "RED_N"].map((m) => (
+                  <div className={`grid gap-2 mt-2 ${currentSport === 'basketball' || currentSport === 'tennis' ? 'grid-cols-2' : 'grid-cols-4'}`}>
+                    {(currentSport === 'basketball' 
+                      ? ["O210.5", "U210.5"] 
+                      : currentSport === 'tennis'
+                      ? ["O22.5", "U22.5"]
+                      : ["O2.5", "U2.5", "BTTS_Y", "BTTS_N", "1X", "X2", "C_O9.5", "C_U9.5", "Y_O3.5", "Y_U3.5", "RED_Y", "RED_N"]
+                    ).map((m) => (
                       <button
                         key={m}
                         onClick={() => addToBetSlip(fixture, m, fixture.odds[m])}
                         className={`odds-btn text-xs ${isSelected(fixture.id, m) ? "selected" : ""}`}
                       >
                         <div className="text-[9px] text-[var(--text-secondary)] mb-0.5">
-                          {MARKET_LABELS[m]}
+                          {currentSport === 'basketball' ? (m === "O210.5" ? "Over 210.5 Pts" : "Under 210.5 Pts") : currentSport === 'tennis' ? (m === "O22.5" ? "Over 22.5 Games" : "Under 22.5 Games") : MARKET_LABELS[m]}
                         </div>
                         {fixture.odds[m]}
                       </button>

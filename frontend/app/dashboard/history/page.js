@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import VirtualTabs from "../components/VirtualTabs";
 
 export default function HistoryPage() {
   const [pendingBets, setPendingBets] = useState([]);
@@ -30,11 +31,17 @@ export default function HistoryPage() {
   };
 
   return (
-    <div className="animate-fade-in max-w-6xl mx-auto space-y-8">
-      <div className="flex justify-between items-end mb-8 border-b border-[var(--border-color)] pb-4">
+    <div className="animate-fade-in max-w-6xl mx-auto space-y-8 pb-20">
+      <div className="text-center mb-8">
+        <h1 className="text-4xl font-black mb-2 uppercase tracking-tight">Virtual Hub</h1>
+        <p className="text-[var(--text-secondary)]">Track all your active and settled wagers.</p>
+      </div>
+      
+      <VirtualTabs />
+
+      <div className="flex justify-between items-end mb-8 border-b border-[var(--border-color)] pb-4 mt-8">
         <div>
-          <h1 className="text-3xl font-bold mb-2">📜 Bet History</h1>
-          <p className="text-[var(--text-secondary)]">Track all your active and settled wagers.</p>
+          <h1 className="text-2xl font-bold mb-2">📜 Bet History</h1>
         </div>
         <Link href="/dashboard/sportsbook" className="btn-primary">
           Place New Bet 📊

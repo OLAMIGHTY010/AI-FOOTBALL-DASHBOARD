@@ -5,9 +5,14 @@ from typing import List, Optional
 import uuid
 from datetime import datetime
 import random
+import scraper
 
 from data import VIRTUAL_TEAMS
+from data_basketball import VIRTUAL_BASKETBALL_TEAMS
 from simulation import generate_fixtures, simulate_match, check_bet_result, calculate_all_odds
+from simulation_basketball import generate_basketball_fixtures, simulate_basketball_match
+from data_tennis import VIRTUAL_TENNIS_PLAYERS
+from simulation_tennis import generate_tennis_fixtures, simulate_tennis_match
 from ut import open_pack, PACKS, get_sell_value
 from tactics import get_tactics_data, FORMATIONS, TACTICAL_STYLES
 from fpl import get_fpl_data, optimize_fpl_squad
@@ -114,6 +119,28 @@ def new_fixtures():
     global current_fixtures
     current_fixtures = generate_fixtures()
     return current_fixtures
+
+@app.get("/api/fixtures/basketball")
+def get_basketball_fixtures():
+    fixtures = generate_basketball_fixtures(VIRTUAL_BASKETBALL_TEAMS)
+    return {"fixtures": fixtures}
+
+@app.post("/api/simulate/basketball")
+def simulate_basketball_matches():
+    fixtures = generate_basketball_fixtures(VIRTUAL_BASKETBALL_TEAMS)
+    results = [simulate_basketball_match(f) for f in fixtures]
+    return {"results": results}
+
+@app.get("/api/fixtures/tennis")
+def get_tennis_fixtures():
+    fixtures = generate_tennis_fixtures(VIRTUAL_TENNIS_PLAYERS)
+    return {"fixtures": fixtures}
+
+@app.post("/api/simulate/tennis")
+def simulate_tennis_matches():
+    fixtures = generate_tennis_fixtures(VIRTUAL_TENNIS_PLAYERS)
+    results = [simulate_tennis_match(f) for f in fixtures]
+    return {"results": results}
 
 
 @app.get("/api/standings/{league}")
@@ -467,3 +494,8 @@ def get_pvp_status(lobby_id: str):
     if lobby_id not in pvp_lobbies:
         raise HTTPException(status_code=404, detail="Lobby not found")
     return pvp_lobbies[lobby_id]
+
+# --- Real-World Standings Endpoint ---
+@app.get("/api/real-standings")
+def get_real_standings():
+    return scraper.get_real_standings()
