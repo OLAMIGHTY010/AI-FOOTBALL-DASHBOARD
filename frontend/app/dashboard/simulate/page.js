@@ -209,12 +209,14 @@ function SimulatePage() {
       if (newEvents.length > 0) {
         setLiveEvents(prev => [...newEvents, ...prev].slice(0, 15));
       } else {
-        if (Math.random() < 0.2) {
+        if (Math.random() < 0.2 && results && results.length > 0) {
           const randomMatch = results[Math.floor(Math.random() * results.length)];
-          setLiveEvents(prev => [
-            { type: "commentary", minute: currentMinute, text: GENERATE_COMMENTARY(randomMatch.home.name, randomMatch.away.name, currentMinute), home: randomMatch.home.name, away: randomMatch.away.name },
-            ...prev
-          ].slice(0, 15));
+          if (randomMatch && randomMatch.home && randomMatch.away) {
+            setLiveEvents(prev => [
+              { type: "commentary", minute: currentMinute, text: GENERATE_COMMENTARY(randomMatch.home.name, randomMatch.away.name, currentMinute), home: randomMatch.home.name, away: randomMatch.away.name },
+              ...prev
+            ].slice(0, 15));
+          }
         }
       }
 
@@ -258,6 +260,7 @@ function SimulatePage() {
         const newStandings = JSON.parse(JSON.stringify(initialStandings)); 
         
         results.forEach(match => {
+          if (!match.home) return;
           const score = calculateLiveScore(match, currentMinute);
           const league = match.home.league;
           const h_name = match.home.name;

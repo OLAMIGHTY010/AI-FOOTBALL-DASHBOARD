@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 
 const API_URL = "http://localhost:8000";
@@ -20,6 +21,13 @@ export default function DashboardLayout({ children }) {
   const [bankroll, setBankroll] = useState(0);
   const [debt, setDebt] = useState(0);
   const [loading, setLoading] = useState(true);
+  const pathname = usePathname();
+
+  const isFPLApp = pathname.startsWith("/dashboard/fpl") || 
+                   pathname.startsWith("/dashboard/leagues") || 
+                   pathname.startsWith("/dashboard/fixtures") || 
+                   pathname.startsWith("/dashboard/community") || 
+                   pathname.startsWith("/dashboard/more");
 
   useEffect(() => {
     const checkUser = async () => {
@@ -90,6 +98,7 @@ export default function DashboardLayout({ children }) {
 
   if (loading || !user) return <div className="min-h-screen flex items-center justify-center text-[var(--text-secondary)]">Loading dashboard...</div>;
 
+
   return (
     <div className="min-h-screen flex flex-col">
       {/* Navbar */}
@@ -149,6 +158,29 @@ export default function DashboardLayout({ children }) {
           </Link>
         ))}
       </div>
+
+      {/* FPL Sub-Navbar */}
+      {isFPLApp && (
+        <div className="bg-[#162032] border-b border-gray-800 shadow-md">
+          <div className="max-w-7xl mx-auto flex items-center overflow-x-auto">
+            <Link href="/dashboard/fpl" className={`px-6 py-3 font-bold text-sm whitespace-nowrap transition-colors ${pathname === '/dashboard/fpl' ? 'text-white border-b-2 border-[#00ff87]' : 'text-gray-400 hover:text-white'}`}>
+              🛡️ Pitch
+            </Link>
+            <Link href="/dashboard/leagues" className={`px-6 py-3 font-bold text-sm whitespace-nowrap transition-colors ${pathname.includes('/leagues') ? 'text-white border-b-2 border-[#00ff87]' : 'text-gray-400 hover:text-white'}`}>
+              🏆 Leagues
+            </Link>
+            <Link href="/dashboard/fixtures" className={`px-6 py-3 font-bold text-sm whitespace-nowrap transition-colors ${pathname.includes('/fixtures') ? 'text-white border-b-2 border-[#00ff87]' : 'text-gray-400 hover:text-white'}`}>
+              📅 Live Fixtures
+            </Link>
+            <Link href="/dashboard/community" className={`px-6 py-3 font-bold text-sm whitespace-nowrap transition-colors ${pathname.includes('/community') ? 'text-white border-b-2 border-[#00ff87]' : 'text-gray-400 hover:text-white'}`}>
+              💬 Community
+            </Link>
+            <Link href="/dashboard/more" className={`px-6 py-3 font-bold text-sm whitespace-nowrap transition-colors ${pathname.includes('/more') ? 'text-white border-b-2 border-[#00ff87]' : 'text-gray-400 hover:text-white'}`}>
+              ••• More
+            </Link>
+          </div>
+        </div>
+      )}
 
       {/* Content */}
       <main className="flex-1 max-w-7xl mx-auto w-full px-4 py-6">

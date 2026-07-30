@@ -18,6 +18,12 @@ export default function FPLPage() {
   const [formation, setFormation] = useState("3-4-3");
   const [optimizing, setOptimizing] = useState(false);
   
+  const [selectedPlayerId, setSelectedPlayerId] = useState(null);
+  
+  // Database filter state
+  const [searchTerm, setSearchTerm] = useState("");
+  const [posFilter, setPosFilter] = useState("ALL");
+  
   // Squad state
   const [squad, setSquad] = useState(null);
   const [punditReport, setPunditReport] = useState(null);
@@ -119,6 +125,17 @@ export default function FPLPage() {
     setOptimizing(false);
   };
 
+  const handlePlayerClick = (playerId) => {
+    if (selectedPlayerId === null) {
+      setSelectedPlayerId(playerId);
+    } else {
+      if (selectedPlayerId !== playerId) {
+        performSwap(selectedPlayerId, playerId);
+      }
+      setSelectedPlayerId(null);
+    }
+  };
+
   const handleDragStart = (e, p, isStarter) => {
     e.dataTransfer.setData("playerId", p.id);
     e.dataTransfer.setData("isStarter", isStarter);
@@ -137,6 +154,8 @@ export default function FPLPage() {
     const allPlayers = [...squad.starting_eleven, ...squad.bench];
     const p1 = allPlayers.find(p => p.id === p1Id);
     const p2 = allPlayers.find(p => p.id === p2Id);
+
+    if (!p1 || !p2) return;
 
     const isP1Starter = squad.starting_eleven.some(p => p.id === p1Id);
     const isP2Starter = squad.starting_eleven.some(p => p.id === p2Id);
@@ -220,6 +239,7 @@ export default function FPLPage() {
 
   const renderPlayerNode = (p, isStarter) => {
     const isCaptain = squad.captain && p.id === squad.captain.id;
+    const isSelected = selectedPlayerId === p.id;
     return (
       <div 
         key={p.id} 
@@ -227,7 +247,8 @@ export default function FPLPage() {
         onDragStart={(e) => handleDragStart(e, p, isStarter)}
         onDragOver={(e) => e.preventDefault()}
         onDrop={(e) => handleDrop(e, p, isStarter)}
-        className="relative flex flex-col items-center justify-center cursor-grab active:cursor-grabbing transition-transform hover:scale-105 mx-1"
+        onClick={() => handlePlayerClick(p.id)}
+        className={`relative flex flex-col items-center justify-center cursor-pointer transition-transform hover:scale-105 mx-1 ${isSelected ? 'ring-4 ring-yellow-400 rounded-lg scale-110 z-30' : ''}`}
       >
         <img 
           src={p.photo || "https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_0-66.webp"}
@@ -235,19 +256,13 @@ export default function FPLPage() {
           className="w-14 h-16 drop-shadow-[0_5px_5px_rgba(0,0,0,0.5)] z-10 object-contain"
           onError={(e) => { e.target.onerror = null; e.target.src = "https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_0-66.webp"; }}
         />
-        <div className="bg-[#37003c] rounded px-2 py-0.5 text-center shadow-lg border-b-2 border-green-400 min-w-[70px] -mt-2 z-20">
+        <div className="bg-[#37003c] rounded-t w-full px-1 py-0.5 text-center mt-1 z-20">
           <div className="text-[10px] font-bold text-white whitespace-nowrap overflow-hidden text-ellipsis w-full flex items-center justify-center gap-1">
-            {p.name.split(' ').pop()} {isCaptain && <span className="text-yellow-400 font-black text-[9px]">(C)</span>}
+            {p.name.split(' ').pop()} {isCaptain && <span className="w-3 h-3 bg-white text-[#37003c] rounded-full flex items-center justify-center font-black text-[8px]">C</span>}
           </div>
-          <div className="text-[10px] text-green-400 font-black">£{p.price.toFixed(1)}m</div>
         </div>
-        <div className="flex gap-1 mt-1">
-          <div className="text-[9px] text-[var(--text-secondary)] font-bold bg-black/60 px-1 py-0.5 rounded shadow-sm">
-            Exp: {p.expected_points.toFixed(1)}
-          </div>
-          <div className="text-[9px] text-[var(--accent-primary)] font-bold bg-black/60 px-1 py-0.5 rounded shadow-sm">
-            Live: {p.live_points !== undefined ? p.live_points : "-"}
-          </div>
+        <div className="bg-[#00ff87] rounded-b w-full px-1 py-0.5 text-center text-[#37003c] z-20 shadow-lg">
+          <div className="text-[9px] font-bold">{p.team} (H)</div>
         </div>
       </div>
     );
@@ -293,20 +308,36 @@ export default function FPLPage() {
         <button onClick={() => setActiveTab("team")} className={`px-4 py-2 rounded font-bold ${activeTab === 'team' ? 'bg-[var(--accent-primary)] text-black' : 'bg-[var(--bg-card)]'}`}>
           👔 My Team
         </button>
-        <button onClick={() => setActiveTab("leagues")} className={`px-4 py-2 rounded font-bold ${activeTab === 'leagues' ? 'bg-yellow-500 text-black' : 'bg-[var(--bg-card)]'}`}>
-          🏆 Leagues
-        </button>
-        <button onClick={() => setActiveTab("chat")} className={`px-4 py-2 rounded font-bold ${activeTab === 'chat' ? 'bg-purple-500 text-white' : 'bg-[var(--bg-card)]'}`}>
-          💬 FPL Chat
-        </button>
       </div>
 
-      {loading && <div className="text-center p-12 text-[var(--accent-primary)] animate-pulse">Loading Live FPL Data...</div>}
+      {loading && <div className="text-center p-12 text-[var(--accent-primary)] animate-pulse">Loading Live Data...</div>}
 
       {/* Transfers / Database */}
       {!loading && activeTab === "transfers" && (
         <div className="glass-card">
-          <h2 className="font-bold text-lg mb-4">Player Database</h2>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="font-bold text-lg">Player Database</h2>
+            <div className="flex gap-2">
+              <input 
+                type="text" 
+                placeholder="Search player..." 
+                className="input-field py-1 px-2 text-sm"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+              <select 
+                className="select-field py-1 px-2 text-sm"
+                value={posFilter}
+                onChange={(e) => setPosFilter(e.target.value)}
+              >
+                <option value="ALL">All Pos</option>
+                <option value="GK">GK</option>
+                <option value="DEF">DEF</option>
+                <option value="MID">MID</option>
+                <option value="FWD">FWD</option>
+              </select>
+            </div>
+          </div>
           <div className="overflow-x-auto max-h-[600px]">
             <table className="w-full text-sm text-left">
               <thead className="text-xs text-[var(--text-secondary)] uppercase bg-[var(--bg-secondary)] sticky top-0 z-20">
@@ -319,7 +350,11 @@ export default function FPLPage() {
                 </tr>
               </thead>
               <tbody>
-                {players.map((p, i) => (
+                {players
+                  .filter(p => posFilter === "ALL" || p.position === posFilter)
+                  .filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()))
+                  .slice(0, 100) // limit to 100 for performance
+                  .map((p, i) => (
                   <tr key={i} className="border-b border-[var(--border-color)]">
                     <td className="px-4 py-3 font-bold">{p.name}</td>
                     <td className="px-4 py-3">{p.team}</td>
@@ -351,7 +386,7 @@ export default function FPLPage() {
                 onChange={(e) => setBudget(parseFloat(e.target.value))}
                 className="input-field"
                 step="0.1"
-                max="100.0"
+                max="150.0"
               />
             </div>
             <div>
@@ -438,9 +473,9 @@ export default function FPLPage() {
                   );
                 })()}
 
-                {/* Drag and Drop Hint */}
+                {/* Click to Swap Hint */}
                 <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/60 text-white px-4 py-1.5 rounded-full font-bold text-xs shadow-lg z-20 border border-white/20 pointer-events-none">
-                  🖱️ Drag & Drop players to substitute
+                  🖱️ Click players to swap them
                 </div>
               </div>
               
@@ -454,6 +489,18 @@ export default function FPLPage() {
                   <div className="flex flex-wrap justify-center gap-2 bg-gradient-to-r from-[#123d21] to-[#1b4d2e] border-2 border-[#2d8a4e] rounded-xl p-4 shadow-inner">
                     {squad.bench.map(p => renderPlayerNode(p, false))}
                   </div>
+                </div>
+
+                <div className="glass-card flex flex-col gap-2">
+                   <button className="btn-primary w-full py-2 font-bold flex items-center justify-center gap-2">
+                     🔄 Auto Subs
+                   </button>
+                   <button className="bg-blue-600 hover:bg-blue-500 text-white w-full py-2 rounded font-bold flex items-center justify-center gap-2 transition-colors">
+                     💰 Team Value (£{squad.total_cost.toFixed(1)}m)
+                   </button>
+                   <button className="bg-purple-600 hover:bg-purple-500 text-white w-full py-2 rounded font-bold flex items-center justify-center gap-2 transition-colors">
+                     📅 Gameweek Transfers
+                   </button>
                 </div>
 
                 <div className="glass-card">

@@ -5,8 +5,10 @@ from typing import List, Optional
 import uuid
 from datetime import datetime
 import random
+import random
+import string
 import scraper
-
+from database import supabase
 from data import VIRTUAL_TEAMS
 from data_basketball import VIRTUAL_BASKETBALL_TEAMS
 from simulation import generate_fixtures, simulate_match, check_bet_result, calculate_all_odds
@@ -19,6 +21,10 @@ from fpl import get_fpl_data, optimize_fpl_squad
 from fpl_uefa import get_uefa_data, optimize_uefa_squad
 from data_racing import get_random_runners
 from simulation_racing import calculate_racing_odds, simulate_race
+from fpl_proxy import (
+    get_fpl_bootstrap, get_fpl_fixtures, get_fpl_league,
+    get_fpl_entry, get_fpl_entry_history
+)
 
 app = FastAPI(title="AI Football Dashboard API")
 
@@ -575,3 +581,149 @@ def get_pvp_status(lobby_id: str):
 @app.get("/api/real-standings")
 def get_real_standings():
     return scraper.get_real_standings()
+
+# --- Official FPL API Endpoints ---
+@app.get("/api/fpl/bootstrap")
+def fpl_bootstrap():
+    return get_fpl_bootstrap()
+
+@app.get("/api/fpl/fixtures")
+def fpl_fixtures():
+    return get_fpl_fixtures()
+
+@app.get("/api/fpl/league/{league_id}")
+def fpl_league(league_id: int):
+    return get_fpl_league(league_id)
+
+@app.get("/api/fpl/entry/{entry_id}")
+def fpl_entry(entry_id: int):
+    return get_fpl_entry(entry_id)
+
+@app.get("/api/fpl/entry/{entry_id}/history")
+def fpl_entry_history(entry_id: int):
+    return get_fpl_entry_history(entry_id)
+
+# --- Real Supabase Endpoints ---
+class CreateLeagueRequest(BaseModel):
+    name: str
+    type: str = "CLASSIC"
+    privacy: str = "PRIVATE"
+    admin_team_id: Optional[int] = None
+
+@app.post("/api/v1/leagues")
+def create_league(req: CreateLeagueRequest):
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Database not configured")
+    
+    invite_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+    
+    try:
+        data, count = supabase.table("leagues").insert({
+            "name": req.name,
+            "type": req.type,
+            "privacy": req.privacy,
+            "admin_team_id": req.admin_team_id,
+            "invite_code": invite_code,
+            "start_gameweek_id": 1
+        }).execute()
+        return {"success": True, "league": data[1][0] if len(data) > 1 and len(data[1]) > 0 else None, "invite_code": invite_code}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.get("/api/v1/leagues/{league_id}")
+def get_league(league_id: int):
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Database not configured")
+        
+    try:
+        response = supabase.table("leagues").select("*").eq("id", league_id).execute()
+        if len(response.data) == 0:
+            raise HTTPException(status_code=404, detail="League not found")
+        return response.data[0]
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+# --- Squad Management Endpoints ---
+
+class TransferRequest(BaseModel):
+    gameweek_id: int
+    transfers_in: List[int]
+    transfers_out: List[int]
+    wildcard_active: bool = False
+
+class Pick(BaseModel):
+    player_id: int
+    position_order: int
+    is_captain: bool = False
+    is_vice_captain: bool = False
+
+class LineupRequest(BaseModel):
+    gameweek_id: int
+    picks: List[Pick]
+
+@app.get("/api/v1/team/{team_id}")
+def get_team(team_id: int):
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Database not configured")
+    try:
+        response = supabase.table("virtual_teams").select("*").eq("id", team_id).execute()
+        if not response.data:
+            raise HTTPException(status_code=404, detail="Team not found")
+        return response.data[0]
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.get("/api/v1/team/{team_id}/squad/{gameweek_id}")
+def get_squad(team_id: int, gameweek_id: int):
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Database not configured")
+    try:
+        # Get squad snapshot
+        snap_resp = supabase.table("squad_snapshots").select("id, active_chip, gameweek_points, transfer_cost").eq("virtual_team_id", team_id).eq("gameweek_id", gameweek_id).execute()
+        if not snap_resp.data:
+            return {"picks": []} # No squad for this gameweek
+        
+        snapshot_id = snap_resp.data[0]["id"]
+        
+        # Get picks
+        picks_resp = supabase.table("squad_picks").select("*, players(*)").eq("squad_snapshot_id", snapshot_id).order("position_order").execute()
+        
+        return {
+            "snapshot": snap_resp.data[0],
+            "picks": picks_resp.data
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/api/v1/team/{team_id}/transfers")
+def submit_transfers(team_id: int, req: TransferRequest):
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Database not configured")
+    try:
+        # In a real implementation, you would:
+        # 1. Fetch current team budget and free transfers
+        # 2. Fetch prices of players in and out
+        # 3. Validate budget constraint
+        # 4. Calculate point deductions (-4 per extra transfer) if wildcard not active
+        # 5. Update team balance and available transfers
+        # 6. Update squad_snapshots and squad_picks
+        # For this prototype, we'll just mock a success response.
+        return {"success": True, "message": f"Processed {len(req.transfers_in)} transfers for Gameweek {req.gameweek_id}"}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.put("/api/v1/team/{team_id}/lineup")
+def save_lineup(team_id: int, req: LineupRequest):
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Database not configured")
+    try:
+        # In a real implementation, you would:
+        # 1. Validate exactly 11 starters (position_order 1-11) and 4 bench (12-15)
+        # 2. Validate formation constraints (min 3 DEF, min 2 MID, min 1 FWD, 1 GK starting)
+        # 3. Validate exactly 1 captain and 1 vice-captain
+        # 4. Fetch squad_snapshot_id for this team_id and gameweek_id
+        # 5. Update/Upsert squad_picks with the new order and captaincy
+        # For this prototype, we'll mock success.
+        return {"success": True, "message": "Lineup saved successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))

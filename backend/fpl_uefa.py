@@ -74,7 +74,7 @@ def fetch_real_squads_from_api():
     for comp, clubs in UEFA_CLUBS.items():
         for team_name, team_id in clubs:
             try:
-                res = requests.get(f"https://v3.football.api-sports.io/players/squads?team={team_id}", headers=headers, timeout=10)
+                res = requests.get(f"https://v3.football.api-sports.io/players/squads?team={team_id}", headers=headers, timeout=2)
                 data = res.json()
                 
                 if data.get("errors") or not data.get("response"):
@@ -108,9 +108,12 @@ def fetch_real_squads_from_api():
                         "selected_by": str(round(random.uniform(0.1, 40.0), 1)),
                         "photo": p.get("photo", "https://resources.premierleague.com/premierleague/photos/players/110x140/Photo-Missing.png")
                     })
+            except requests.exceptions.ConnectionError as e:
+                print(f"Network unreachable, aborting fetch to use fallback. Error: {e}")
+                return None
             except Exception as e:
                 print(f"Error fetching {team_name}: {e}")
-                
+                continue
     if sum(len(lst) for lst in real_players.values()) > 0:
         try:
             with open(CACHE_FILE, "w") as f:
@@ -169,6 +172,7 @@ def optimize_uefa_squad(competition: str, budget: float = 100.0, max_per_team: i
         curr_price = 0.0
 
         for p in sorted_players:
+            if sum(counts.values()) >= 15: break
             pos = p["position"]
             tm = p["team"]
             if counts[pos] < limits[pos] and team_counts.get(tm, 0) < max_per_team and (curr_price + p["price"]) <= budget:
@@ -176,6 +180,31 @@ def optimize_uefa_squad(competition: str, budget: float = 100.0, max_per_team: i
                 counts[pos] += 1
                 team_counts[tm] = team_counts.get(tm, 0) + 1
                 curr_price += p["price"]
+
+        # If we didn't get a full squad due to budget, ignore budget
+        if sum(counts.values()) < 15:
+            cheapest_players = sorted(players, key=lambda p: p["price"])
+            for p in cheapest_players:
+                if sum(counts.values()) >= 15: break
+                if p not in selected_players:
+                    pos = p["position"]
+                    tm = p["team"]
+                    if counts[pos] < limits[pos] and team_counts.get(tm, 0) < max_per_team:
+                        selected_players.append(p)
+                        counts[pos] += 1
+                        team_counts[tm] = team_counts.get(tm, 0) + 1
+                        curr_price += p["price"]
+
+        # If we still don't have 15, ignore max_per_team
+        if sum(counts.values()) < 15:
+            for p in sorted(players, key=lambda p: p["expected_points"], reverse=True):
+                if sum(counts.values()) >= 15: break
+                if p not in selected_players:
+                    pos = p["position"]
+                    if counts[pos] < limits[pos]:
+                        selected_players.append(p)
+                        counts[pos] += 1
+                        curr_price += p["price"]
 
     selected_players.sort(key=lambda p: p["expected_points"], reverse=True)
 
