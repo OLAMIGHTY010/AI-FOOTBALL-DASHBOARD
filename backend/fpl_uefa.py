@@ -3,10 +3,20 @@ import pulp
 import random
 import uuid
 
+import os
+from dotenv import load_dotenv
+import requests
+import json
+import time
+
+load_dotenv()
+API_FOOTBALL_KEY = os.getenv("API_FOOTBALL_KEY")
+CACHE_FILE = "cache_uefa_players.json"
+
 UEFA_CLUBS = {
-    "ucl": ["Real Madrid", "Man City", "Bayern Munich", "PSG", "Arsenal", "Inter Milan", "Barcelona", "Liverpool"],
-    "uel": ["Roma", "Man United", "Tottenham", "Porto", "Athletic Club", "Ajax", "Lazio", "Fenerbahce"],
-    "uecl": ["Chelsea", "Fiorentina", "Real Betis", "Heidenheim", "Panathinaikos", "Copenhagen", "Legia Warsaw", "Gent"]
+    "ucl": [("Real Madrid", 541), ("Man City", 50), ("Bayern Munich", 157), ("PSG", 85), ("Arsenal", 42), ("Inter Milan", 505), ("Barcelona", 529), ("Liverpool", 40)],
+    "uel": [("Roma", 52), ("Man United", 33), ("Tottenham", 47), ("Porto", 212), ("Athletic Club", 531), ("Ajax", 194), ("Lazio", 487), ("Fenerbahce", 611)],
+    "uecl": [("Chelsea", 49), ("Fiorentina", 502), ("Real Betis", 543), ("Heidenheim", 73), ("Panathinaikos", 622), ("Copenhagen", 620), ("Legia Warsaw", 618), ("Gent", 617)]
 }
 
 # Pre-generate mock players to keep them consistent across requests
@@ -29,7 +39,7 @@ def _generate_mock_players():
                     "id": f"{comp}_{team_idx}_{p_idx}",
                     "name": f"{random.choice(first_names)} {random.choice(last_names)}",
                     "team_id": team_idx,
-                    "team": team,
+                    "team": team[0],
                     "position": pos,
                     "price": price,
                     "expected_points": max(1.0, expected_points),
@@ -41,8 +51,81 @@ def _generate_mock_players():
 
 _generate_mock_players()
 
+def fetch_real_squads_from_api():
+    if os.path.exists(CACHE_FILE):
+        # Check cache age (24 hours = 86400 seconds)
+        if time.time() - os.path.getmtime(CACHE_FILE) < 86400:
+            try:
+                with open(CACHE_FILE, "r") as f:
+                    return json.load(f)
+            except Exception as e:
+                print(f"Error loading cache: {e}")
+                
+    if not API_FOOTBALL_KEY or API_FOOTBALL_KEY == "your_api_key_here":
+        return None
+        
+    print("Fetching real UEFA squads from API-Football...")
+    headers = {
+        "x-apisports-key": API_FOOTBALL_KEY
+    }
+    
+    real_players = {"ucl": [], "uel": [], "uecl": []}
+    
+    for comp, clubs in UEFA_CLUBS.items():
+        for team_name, team_id in clubs:
+            try:
+                res = requests.get(f"https://v3.football.api-sports.io/players/squads?team={team_id}", headers=headers, timeout=10)
+                data = res.json()
+                
+                if data.get("errors") or not data.get("response"):
+                    print(f"API Error for {team_name}: {data.get('errors')}")
+                    continue
+                    
+                squad = data["response"][0]["players"]
+                for p in squad:
+                    pos_str = p.get("position", "Unknown")
+                    if pos_str == "Goalkeeper": pos = "GK"
+                    elif pos_str == "Defender": pos = "DEF"
+                    elif pos_str == "Midfielder": pos = "MID"
+                    elif pos_str == "Attacker": pos = "FWD"
+                    else: continue
+                    
+                    # Generate dynamic price/expected points based on position and random offset
+                    price_base = {"GK": 5.0, "DEF": 5.5, "MID": 7.5, "FWD": 9.0}[pos]
+                    price = round(price_base + random.uniform(-1.0, 3.0), 1)
+                    expected_points = round(price * 1.5 + random.uniform(-2, 4), 1)
+                    
+                    real_players[comp].append({
+                        "id": str(p["id"]),
+                        "name": p["name"],
+                        "team_id": team_id,
+                        "team": team_name,
+                        "position": pos,
+                        "price": price,
+                        "expected_points": max(1.0, expected_points),
+                        "live_points": int(max(0, expected_points + random.uniform(-3, 5))),
+                        "form": str(round(random.uniform(2.0, 8.0), 1)),
+                        "selected_by": str(round(random.uniform(0.1, 40.0), 1)),
+                        "photo": p.get("photo", "https://resources.premierleague.com/premierleague/photos/players/110x140/Photo-Missing.png")
+                    })
+            except Exception as e:
+                print(f"Error fetching {team_name}: {e}")
+                
+    if sum(len(lst) for lst in real_players.values()) > 0:
+        try:
+            with open(CACHE_FILE, "w") as f:
+                json.dump(real_players, f)
+        except Exception as e:
+            print(f"Error saving cache: {e}")
+        return real_players
+        
+    return None
+
 def get_uefa_data(competition: str) -> List[Dict[str, Any]]:
-    """Returns mock UEFA Fantasy data for a given competition (ucl, uel, uecl)."""
+    """Returns real UEFA Fantasy data if available, otherwise mock data."""
+    real_data = fetch_real_squads_from_api()
+    if real_data and real_data.get(competition):
+        return real_data[competition]
     return MOCK_UEFA_PLAYERS.get(competition, [])
 
 def optimize_uefa_squad(competition: str, budget: float = 100.0, max_per_team: int = 3, formation: str = "3-4-3") -> Dict[str, Any]:
