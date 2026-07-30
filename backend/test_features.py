@@ -103,8 +103,33 @@ def test_tennis_simulate_endpoint():
 
 def test_existing_endpoints():
     """Test pre-existing endpoints for complete backend coverage."""
-    resp_teams = client.get("/api/teams")
-    assert resp_teams.status_code == 200
+    response = client.get("/api/teams")
+    assert response.status_code == 200
+
+def test_uefa_endpoints():
+    """Test new UEFA Fantasy endpoints."""
+    # Test data endpoint
+    for comp in ["ucl", "uel", "uecl"]:
+        response = client.get(f"/api/uefa/data?competition={comp}")
+        assert response.status_code == 200, f"Expected 200 for {comp}, got {response.status_code}"
+        data = response.json()
+        assert "players" in data
+        assert len(data["players"]) > 0
+    
+    # Test optimize endpoint
+    payload = {
+        "competition": "ucl",
+        "budget": 100.0,
+        "max_per_team": 3,
+        "formation": "4-4-2"
+    }
+    response = client.post("/api/uefa/optimize", json=payload)
+    assert response.status_code == 200, f"Expected 200, got {response.status_code}"
+    data = response.json()
+    assert "squad" in data
+    assert len(data["squad"]) == 15
+    assert len(data["starting_eleven"]) == 11
+    assert len(data["bench"]) == 4
 
     resp_fixtures = client.get("/api/fixtures")
     assert resp_fixtures.status_code == 200

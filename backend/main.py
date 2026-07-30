@@ -16,6 +16,7 @@ from simulation_tennis import generate_tennis_fixtures, simulate_tennis_match
 from ut import open_pack, PACKS, get_sell_value
 from tactics import get_tactics_data, FORMATIONS, TACTICAL_STYLES
 from fpl import get_fpl_data, optimize_fpl_squad
+from fpl_uefa import get_uefa_data, optimize_uefa_squad
 
 app = FastAPI(title="AI Football Dashboard API")
 
@@ -86,6 +87,11 @@ class FPLOptimizeRequest(BaseModel):
     max_per_team: Optional[int] = 3
     formation: Optional[str] = "3-4-3"
 
+class UEFAOptimizeRequest(BaseModel):
+    competition: str
+    budget: Optional[float] = 100.0
+    max_per_team: Optional[int] = 3
+    formation: Optional[str] = "3-4-3"
 
 @app.get("/api/teams")
 def get_teams():
@@ -402,6 +408,25 @@ def fpl_analyze(req: FPLAnalyzeRequest):
     report = f"🎙️ **Pundit Report**: What a gameweek! **{top_team['name']}** is absolutely flying at the top with {top_team['pts']} points. They look unstoppable right now. On the other hand, serious questions need to be asked about **{bottom_team['name']}**. Rooted to the bottom with just {bottom_team['pts']} points... the manager's seat must be getting hot! They need a tactical rethink immediately."
     
     return {"success": True, "report": report}
+
+
+# --- UEFA Fantasy Endpoints ---
+@app.get("/api/uefa/data")
+def get_uefa_player_data(competition: str):
+    data = get_uefa_data(competition)
+    if not data:
+        raise HTTPException(status_code=404, detail="Competition not found or no data")
+    return {"players": data}
+
+@app.post("/api/uefa/optimize")
+def optimize_uefa(req: UEFAOptimizeRequest):
+    budget = req.budget if req.budget is not None else 100.0
+    max_per_team = req.max_per_team if req.max_per_team is not None else 3
+    formation = req.formation if req.formation is not None else "3-4-3"
+    result = optimize_uefa_squad(competition=req.competition, budget=budget, max_per_team=max_per_team, formation=formation)
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
 
 
 # --- Tactics Endpoints ---

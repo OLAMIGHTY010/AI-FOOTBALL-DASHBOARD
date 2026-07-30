@@ -8,6 +8,7 @@ const API_URL = "http://localhost:8000";
 
 export default function FPLPage() {
   const [activeTab, setActiveTab] = useState("transfers");
+  const [competition, setCompetition] = useState("epl"); // epl, ucl, uel, uecl
   const [players, setPlayers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [session, setSession] = useState(null);
@@ -49,24 +50,26 @@ export default function FPLPage() {
     });
 
     const fetchFpl = async () => {
+      setLoading(true);
       try {
-        const res = await fetch(`${API_URL}/api/fpl/data`);
+        const endpoint = competition === "epl" ? `${API_URL}/api/fpl/data` : `${API_URL}/api/uefa/data?competition=${competition}`;
+        const res = await fetch(endpoint);
         const json = await res.json();
         setPlayers(json.players || json || []);
       } catch (err) {
-        console.error("Failed to load FPL data", err);
+        console.error(`Failed to load ${competition} data`, err);
       }
       setLoading(false);
     };
     fetchFpl();
     
     // Load from local storage if exists
-    setSquad(JSON.parse(localStorage.getItem("fpl_squad") || "null"));
-  }, []);
+    setSquad(JSON.parse(localStorage.getItem(`fpl_squad_${competition}`) || "null"));
+  }, [competition]);
 
   const saveSquadLocally = async (newSquad) => {
     setSquad(newSquad);
-    localStorage.setItem("fpl_squad", JSON.stringify(newSquad));
+    localStorage.setItem(`fpl_squad_${competition}`, JSON.stringify(newSquad));
 
     // Sync to fpl_scores in Supabase
     if (session) {
@@ -89,10 +92,17 @@ export default function FPLPage() {
   const runOptimizer = async () => {
     setOptimizing(true);
     try {
-      const res = await fetch(`${API_URL}/api/fpl/optimize`, {
+      let endpoint = `${API_URL}/api/fpl/optimize`;
+      let payload = { budget, formation };
+      if (competition !== "epl") {
+        endpoint = `${API_URL}/api/uefa/optimize`;
+        payload = { competition, budget, formation };
+      }
+
+      const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ budget, formation }),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (data.error) {
@@ -246,10 +256,30 @@ export default function FPLPage() {
   return (
     <div className="animate-fade-in max-w-7xl mx-auto pb-12">
       <div className="text-center mb-6">
-        <h1 className="text-3xl font-bold mb-2">🦁 FPL AI Predictor</h1>
+        <h1 className="text-3xl font-bold mb-2">
+          {competition === "epl" ? "🦁 FPL AI Predictor" : competition === "ucl" ? "⭐️ UCL Fantasy AI" : competition === "uel" ? "🌍 UEL Fantasy AI" : "🟢 UECL Fantasy AI"}
+        </h1>
         <p className="text-[var(--text-secondary)]">
-          Connects to the official Fantasy Premier League API to predict expected points and build the mathematically optimal squad.
+          {competition === "epl" 
+            ? "Connects to the official Fantasy Premier League API to predict expected points and build the mathematically optimal squad."
+            : "Generate optimal UEFA Fantasy squads using advanced predictive modeling and LP solvers."}
         </p>
+      </div>
+
+      {/* Competition Selector */}
+      <div className="flex justify-center gap-2 mb-4 max-w-4xl mx-auto">
+        <button onClick={() => setCompetition("epl")} className={`px-4 py-1.5 rounded-full text-sm font-bold border transition-colors ${competition === 'epl' ? 'bg-[#38003c] border-purple-400 text-white' : 'border-[var(--border-color)] text-[var(--text-secondary)] hover:text-white'}`}>
+          🦁 Premier League
+        </button>
+        <button onClick={() => setCompetition("ucl")} className={`px-4 py-1.5 rounded-full text-sm font-bold border transition-colors ${competition === 'ucl' ? 'bg-[#001c54] border-blue-400 text-white' : 'border-[var(--border-color)] text-[var(--text-secondary)] hover:text-white'}`}>
+          ⭐️ Champions League
+        </button>
+        <button onClick={() => setCompetition("uel")} className={`px-4 py-1.5 rounded-full text-sm font-bold border transition-colors ${competition === 'uel' ? 'bg-[#f47321] border-orange-400 text-black' : 'border-[var(--border-color)] text-[var(--text-secondary)] hover:text-white'}`}>
+          🌍 Europa League
+        </button>
+        <button onClick={() => setCompetition("uecl")} className={`px-4 py-1.5 rounded-full text-sm font-bold border transition-colors ${competition === 'uecl' ? 'bg-[#00b140] border-green-400 text-black' : 'border-[var(--border-color)] text-[var(--text-secondary)] hover:text-white'}`}>
+          🟢 Conference League
+        </button>
       </div>
 
       {/* Tabs */}
