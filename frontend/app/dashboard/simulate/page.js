@@ -6,6 +6,7 @@ import { getMarketLabel } from "@/lib/utils";
 import VirtualTabs from "../components/VirtualTabs";
 import BasketballCourt from "./components/BasketballCourt";
 import TennisCourt from "./components/TennisCourt";
+import RaceTrack from "./components/RaceTrack";
 
 const API_URL = "http://localhost:8000";
 
@@ -79,8 +80,8 @@ export default function SimulatePageWrapper() {
 function SimulatePage() {
   const searchParams = useSearchParams();
   const currentSport = searchParams.get("sport") || "football";
-  const apiEndpointFix = currentSport === "basketball" ? `${API_URL}/api/fixtures/basketball` : currentSport === "tennis" ? `${API_URL}/api/fixtures/tennis` : `${API_URL}/api/fixtures`;
-  const apiEndpointSim = currentSport === "basketball" ? `${API_URL}/api/simulate/basketball` : currentSport === "tennis" ? `${API_URL}/api/simulate/tennis` : `${API_URL}/api/simulate`;
+  const apiEndpointFix = currentSport === "basketball" ? `${API_URL}/api/fixtures/basketball` : currentSport === "tennis" ? `${API_URL}/api/fixtures/tennis` : currentSport === "racing" ? `${API_URL}/api/fixtures/racing` : `${API_URL}/api/fixtures`;
+  const apiEndpointSim = currentSport === "basketball" ? `${API_URL}/api/simulate/basketball` : currentSport === "tennis" ? `${API_URL}/api/simulate/tennis` : currentSport === "racing" ? `${API_URL}/api/simulate/racing` : `${API_URL}/api/simulate`;
 
   const [results, setResults] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -186,13 +187,23 @@ function SimulatePage() {
       let featuredEvent = null;
 
       results.forEach(match => {
-        const eventsNow = match.events.filter(e => e.minute === currentMinute);
-        eventsNow.forEach(e => {
-          newEvents.push({ matchId: match.id, home: match.home.name, away: match.away.name, ...e });
-          if (match.id === featuredMatchId) {
-            featuredEvent = e;
-          }
-        });
+        if (currentSport === "racing") {
+            const eventNow = match.events.find(e => e.tick === currentMinute);
+            if (eventNow) {
+              newEvents.push({ matchId: match.id, type: "tick", ...eventNow });
+              if (match.id === featuredMatchId) {
+                featuredEvent = { type: "tick", ...eventNow };
+              }
+            }
+        } else {
+            const eventsNow = match.events.filter(e => e.minute === currentMinute);
+            eventsNow.forEach(e => {
+              newEvents.push({ matchId: match.id, home: match.home.name, away: match.away.name, ...e });
+              if (match.id === featuredMatchId) {
+                featuredEvent = e;
+              }
+            });
+        }
       });
 
       if (newEvents.length > 0) {
@@ -374,14 +385,23 @@ function SimulatePage() {
           const a_g = match.a_goals;
           const market = leg.market;
           let won = false;
-          
-          if (market === "1" && h_g > a_g) won = true;
-          else if (market === "X" && h_g === a_g) won = true;
-          else if (market === "2" && h_g < a_g) won = true;
-          else if (market === "O2.5" && h_g + a_g > 2.5) won = true;
-          else if (market === "U2.5" && h_g + a_g < 2.5) won = true;
-          else if (market === "BTTS_Y" && h_g > 0 && a_g > 0) won = true;
-          else if (market === "BTTS_N" && (h_g === 0 || a_g === 0)) won = true;
+          if (market.startsWith("WIN_")) {
+            const runnerId = parseInt(market.split("_")[1]);
+            const winner = match.standings[0];
+            if (winner && winner.id === runnerId) won = true;
+          } else if (market.startsWith("PLC_")) {
+            const runnerId = parseInt(market.split("_")[1]);
+            const placed = match.standings.slice(0, 3).find(r => r.id === runnerId);
+            if (placed) won = true;
+          } else {
+            if (market === "1" && h_g > a_g) won = true;
+            else if (market === "X" && h_g === a_g) won = true;
+            else if (market === "2" && h_g < a_g) won = true;
+            else if (market === "O2.5" && h_g + a_g > 2.5) won = true;
+            else if (market === "U2.5" && h_g + a_g < 2.5) won = true;
+            else if (market === "BTTS_Y" && h_g > 0 && a_g > 0) won = true;
+            else if (market === "BTTS_N" && (h_g === 0 || a_g === 0)) won = true;
+          }
           
           if (!won) allWon = false;
         }
@@ -674,30 +694,41 @@ function SimulatePage() {
             
             <div className="glass-card bg-gradient-to-b from-black to-[#0a0a0a] border border-[var(--border-color)] p-0 overflow-hidden rounded-xl">
               {/* Scoreboard Header */}
-              <div className="flex justify-between items-center p-4 bg-black/60 border-b border-white/10 relative">
-                <div className="absolute top-2 left-4 text-xs font-bold text-[var(--text-secondary)]">
-                  WEATHER: {featuredMatch.weather === "Rain" ? "🌧️ RAIN" : featuredMatch.weather === "Snow" ? "❄️ SNOW" : "☀️ SUNNY"}
+              {currentSport === "racing" ? (
+                <div className="flex justify-center items-center p-4 bg-black/60 border-b border-white/10 relative">
+                  <div className="text-center font-black text-xl md:text-2xl">{featuredMatch.name}</div>
                 </div>
-                <div className="flex-1 text-right font-black text-xl md:text-2xl">{featuredMatch.home.name}</div>
-                <div className="px-6 py-2 bg-black rounded-lg border border-[var(--accent-primary)] mx-4 flex flex-col items-center">
-                  <span className="text-3xl font-black gradient-text">
-                    {currentSport === "tennis" ? (
-                      `${featuredScore.h_sets} - ${featuredScore.a_sets}`
-                    ) : (
-                      `${featuredScore.h} - ${featuredScore.a}`
-                    )}
-                  </span>
-                  {currentSport === "tennis" && featuredScore.score && (
-                    <span className="text-xs text-[#c6ff00] font-bold">
-                      {featuredScore.h_games}-{featuredScore.a_games} ({featuredScore.score})
+              ) : (
+                <div className="flex justify-between items-center p-4 bg-black/60 border-b border-white/10 relative">
+                  <div className="absolute top-2 left-4 text-xs font-bold text-[var(--text-secondary)]">
+                    WEATHER: {featuredMatch.weather === "Rain" ? "🌧️ RAIN" : featuredMatch.weather === "Snow" ? "❄️ SNOW" : "☀️ SUNNY"}
+                  </div>
+                  <div className="flex-1 text-right font-black text-xl md:text-2xl">{featuredMatch.home.name}</div>
+                  <div className="px-6 py-2 bg-black rounded-lg border border-[var(--accent-primary)] mx-4 flex flex-col items-center">
+                    <span className="text-3xl font-black gradient-text">
+                      {currentSport === "tennis" ? (
+                        `${featuredScore.h_sets} - ${featuredScore.a_sets}`
+                      ) : (
+                        `${featuredScore.h} - ${featuredScore.a}`
+                      )}
                     </span>
-                  )}
+                    {currentSport === "tennis" && featuredScore.score && (
+                      <span className="text-xs text-[#c6ff00] font-bold">
+                        {featuredScore.h_games}-{featuredScore.a_games} ({featuredScore.score})
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex-1 text-left font-black text-xl md:text-2xl">{featuredMatch.away.name}</div>
                 </div>
-                <div className="flex-1 text-left font-black text-xl md:text-2xl">{featuredMatch.away.name}</div>
-              </div>
+              )}
 
               {/* Pitch or Court Container */}
-              {currentSport === "basketball" ? (
+              {currentSport === "racing" ? (
+                <RaceTrack 
+                  raceData={featuredMatch} 
+                  currentEvent={liveEvents.find(e => e.matchId === featuredMatchId && e.type === "tick")} 
+                />
+              ) : currentSport === "basketball" ? (
                 <BasketballCourt 
                   homePlayers={courtPlayers.home}
                   awayPlayers={courtPlayers.away}
@@ -775,7 +806,7 @@ function SimulatePage() {
             </div>
             
             {/* Live In-Play Betting */}
-            {isLive && currentMinute < 85 && (
+            {isLive && currentMinute < 85 && currentSport !== "racing" && (
               <div className="mt-4 glass-card border border-red-500/50 relative overflow-hidden">
                 <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-red-600 to-red-400"></div>
                 <div className="flex justify-between items-center mb-3">
@@ -814,7 +845,7 @@ function SimulatePage() {
         )}
 
         {/* Other Matches Grid */}
-        {results && (
+        {results && currentSport !== "racing" && (
           <div className="space-y-4">
             <h2 className="text-xl font-bold border-b border-[var(--border-color)] pb-2 flex justify-between">
               <span>All Matches</span>

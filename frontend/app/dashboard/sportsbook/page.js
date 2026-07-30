@@ -18,7 +18,7 @@ export default function SportsbookPageWrapper() {
 function SportsbookPage() {
   const searchParams = useSearchParams();
   const currentSport = searchParams.get("sport") || "football";
-  const apiEndpoint = currentSport === "basketball" ? `${API_URL}/api/fixtures/basketball` : currentSport === "tennis" ? `${API_URL}/api/fixtures/tennis` : `${API_URL}/api/fixtures`;
+  const apiEndpoint = currentSport === "basketball" ? `${API_URL}/api/fixtures/basketball` : currentSport === "tennis" ? `${API_URL}/api/fixtures/tennis` : currentSport === "racing" ? `${API_URL}/api/fixtures/racing` : `${API_URL}/api/fixtures`;
 
   const [fixtures, setFixtures] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -64,8 +64,13 @@ function SportsbookPage() {
       }
       
       setFixtures(data);
-      const uniqueLeagues = [...new Set(data.map((f) => f.home.league))];
-      setLeagues(uniqueLeagues);
+      if (currentSport === "racing") {
+        setLeagues([]);
+        setSelectedLeague("All");
+      } else {
+        const uniqueLeagues = [...new Set(data.map((f) => f.home?.league).filter(Boolean))];
+        setLeagues(uniqueLeagues);
+      }
     } catch (err) {
       console.error("Failed to fetch fixtures:", err);
     }
@@ -101,9 +106,9 @@ function SportsbookPage() {
           alert("You cannot combine mutually exclusive markets in a Bet Builder!");
           return prevSlip;
         }
-        return [...prevSlip, { fixtureId: fixture.id, home: fixture.home.name, away: fixture.away.name, market, odds }];
+        return [...prevSlip, { fixtureId: fixture.id, home: fixture.home?.name || fixture.name, away: fixture.away?.name || null, market, odds }];
       } else {
-        return [...prevSlip.filter((b) => b.fixtureId !== fixture.id), { fixtureId: fixture.id, home: fixture.home.name, away: fixture.away.name, market, odds }];
+        return [...prevSlip.filter((b) => b.fixtureId !== fixture.id), { fixtureId: fixture.id, home: fixture.home?.name || fixture.name, away: fixture.away?.name || null, market, odds }];
       }
     });
   };
@@ -186,9 +191,9 @@ function SportsbookPage() {
     alert("Loan approved! $500 added to your account. You now owe the bank $550.");
   };
 
-  const filteredFixtures = selectedLeague === "All"
+  const filteredFixtures = selectedLeague === "All" || currentSport === "racing"
     ? fixtures
-    : fixtures.filter((f) => f.home.league === selectedLeague);
+    : fixtures.filter((f) => f.home?.league === selectedLeague);
 
   return (
     <div className="flex gap-6 animate-fade-in flex-col lg:flex-row pb-20">
@@ -264,73 +269,112 @@ function SportsbookPage() {
           <div className="space-y-3">
             {filteredFixtures.map((fixture) => (
               <div key={fixture.id} className="glass-card">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs text-[var(--accent-primary)] font-semibold">
-                    {fixture.home.league}
-                  </span>
-                  <span className="text-xs text-[var(--text-secondary)]">
-                    ⭐ {fixture.home.star} vs {fixture.away.star}
-                  </span>
-                </div>
-
-                {/* Teams */}
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex-1">
-                    <p className="font-bold">{fixture.home.name}</p>
-                    <p className="text-xs text-[var(--text-secondary)]">
-                      PWR {fixture.home.power}
-                    </p>
-                  </div>
-                  <div className="px-4 text-lg font-bold text-[var(--text-secondary)]">vs</div>
-                  <div className="flex-1 text-right">
-                    <p className="font-bold">{fixture.away.name}</p>
-                    <p className="text-xs text-[var(--text-secondary)]">
-                      PWR {fixture.away.power}
-                    </p>
-                  </div>
-                </div>
-
-                {/* 1X2 Odds (or Moneyline for Basketball/Tennis) */}
-                <div className={`grid ${currentSport === 'basketball' || currentSport === 'tennis' ? 'grid-cols-2' : 'grid-cols-3'} gap-2 mb-2`}>
-                  {(currentSport === 'basketball' || currentSport === 'tennis' ? ["1", "2"] : ["1", "X", "2"]).map((m) => (
-                    <button
-                      key={m}
-                      onClick={() => addToBetSlip(fixture, m, fixture.odds[m])}
-                      className={`odds-btn ${isSelected(fixture.id, m) ? "selected" : ""}`}
-                    >
-                      <div className="text-[10px] text-[var(--text-secondary)] mb-0.5">
-                        {currentSport === 'basketball' ? (m === "1" ? "Home Win" : "Away Win") : currentSport === 'tennis' ? (m === "1" ? "Home Win" : "Away Win") : MARKET_LABELS[m]}
-                      </div>
-                      {fixture.odds[m]}
-                    </button>
-                  ))}
-                </div>
-
-                {/* More Markets */}
-                <details className="mt-2">
-                  <summary className="text-xs text-[var(--text-secondary)] cursor-pointer hover:text-[var(--accent-primary)]">
-                    + More Markets
-                  </summary>
-                  <div className={`grid gap-2 mt-2 ${currentSport === 'basketball' || currentSport === 'tennis' ? 'grid-cols-2' : 'grid-cols-4'}`}>
-                    {(currentSport === 'basketball' 
-                      ? ["O210.5", "U210.5"] 
-                      : currentSport === 'tennis'
-                      ? ["O22.5", "U22.5"]
-                      : ["O2.5", "U2.5", "BTTS_Y", "BTTS_N", "1X", "X2", "C_O9.5", "C_U9.5", "Y_O3.5", "Y_U3.5", "RED_Y", "RED_N"]
-                    ).map((m) => (
-                      <button
-                        key={m}
-                        onClick={() => addToBetSlip(fixture, m, fixture.odds[m])}
-                        className={`odds-btn text-xs ${isSelected(fixture.id, m) ? "selected" : ""}`}
-                      >
-                        <div className="text-[9px] text-[var(--text-secondary)] mb-0.5">
-                          {currentSport === 'basketball' ? (m === "O210.5" ? "Over 210.5 Pts" : "Under 210.5 Pts") : currentSport === 'tennis' ? (m === "O22.5" ? "Over 22.5 Games" : "Under 22.5 Games") : MARKET_LABELS[m]}
+                {currentSport === "racing" ? (
+                  <>
+                    <div className="flex items-center justify-between mb-3 border-b border-white/10 pb-2">
+                      <span className="text-sm text-[var(--accent-primary)] font-black uppercase">
+                        🏁 {fixture.name}
+                      </span>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
+                      {fixture.runners?.map((runner, rIdx) => (
+                        <div key={runner.id} className="flex justify-between items-center bg-black/20 p-2 rounded border border-white/5">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-bold text-gray-500 w-4">{rIdx + 1}.</span>
+                            <span className="text-sm font-bold truncate max-w-[120px]">{runner.name}</span>
+                          </div>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => addToBetSlip(fixture, `WIN_${runner.id}`, runner.odds.win_decimal)}
+                              className={`odds-btn px-3 py-1 ${isSelected(fixture.id, `WIN_${runner.id}`) ? "selected" : ""}`}
+                            >
+                              <span className="text-[9px] block text-[var(--text-secondary)]">Win</span>
+                              {runner.odds.win_decimal}
+                            </button>
+                            <button
+                              onClick={() => addToBetSlip(fixture, `PLC_${runner.id}`, runner.odds.place_decimal)}
+                              className={`odds-btn px-3 py-1 ${isSelected(fixture.id, `PLC_${runner.id}`) ? "selected" : ""}`}
+                            >
+                              <span className="text-[9px] block text-[var(--text-secondary)]">Place</span>
+                              {runner.odds.place_decimal}
+                            </button>
+                          </div>
                         </div>
-                        {fixture.odds[m]}
-                      </button>
-                    ))}
-                  </div>
-                </details>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-xs text-[var(--accent-primary)] font-semibold">
+                        {fixture.home?.league}
+                      </span>
+                      <span className="text-xs text-[var(--text-secondary)]">
+                        ⭐ {fixture.home?.star} vs {fixture.away?.star}
+                      </span>
+                    </div>
+
+                    {/* Teams */}
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex-1">
+                        <p className="font-bold">{fixture.home?.name}</p>
+                        <p className="text-xs text-[var(--text-secondary)]">
+                          PWR {fixture.home?.power}
+                        </p>
+                      </div>
+                      <div className="px-4 text-lg font-bold text-[var(--text-secondary)]">vs</div>
+                      <div className="flex-1 text-right">
+                        <p className="font-bold">{fixture.away?.name}</p>
+                        <p className="text-xs text-[var(--text-secondary)]">
+                          PWR {fixture.away?.power}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* 1X2 Odds (or Moneyline for Basketball/Tennis) */}
+                    <div className={`grid ${currentSport === 'basketball' || currentSport === 'tennis' ? 'grid-cols-2' : 'grid-cols-3'} gap-2 mb-2`}>
+                      {(currentSport === 'basketball' || currentSport === 'tennis' ? ["1", "2"] : ["1", "X", "2"]).map((m) => (
+                        <button
+                          key={m}
+                          onClick={() => addToBetSlip(fixture, m, fixture.odds[m])}
+                          className={`odds-btn ${isSelected(fixture.id, m) ? "selected" : ""}`}
+                        >
+                          <div className="text-[10px] text-[var(--text-secondary)] mb-0.5">
+                            {currentSport === 'basketball' ? (m === "1" ? "Home Win" : "Away Win") : currentSport === 'tennis' ? (m === "1" ? "Home Win" : "Away Win") : MARKET_LABELS[m]}
+                          </div>
+                          {fixture.odds[m]}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* More Markets */}
+                    <details className="mt-2">
+                      <summary className="text-xs text-[var(--text-secondary)] cursor-pointer hover:text-[var(--accent-primary)]">
+                        + More Markets
+                      </summary>
+                      <div className={`grid gap-2 mt-2 ${currentSport === 'basketball' || currentSport === 'tennis' ? 'grid-cols-2' : 'grid-cols-4'}`}>
+                        {(currentSport === 'basketball' 
+                          ? ["O210.5", "U210.5"] 
+                          : currentSport === 'tennis'
+                          ? ["O22.5", "U22.5"]
+                          : ["O2.5", "U2.5", "BTTS_Y", "BTTS_N", "1X", "X2", "C_O9.5", "C_U9.5", "Y_O3.5", "Y_U3.5", "RED_Y", "RED_N"]
+                        ).map((m) => (
+                          <button
+                            key={m}
+                            onClick={() => addToBetSlip(fixture, m, fixture.odds[m])}
+                            className={`odds-btn text-xs ${isSelected(fixture.id, m) ? "selected" : ""}`}
+                          >
+                            <div className="text-[9px] text-[var(--text-secondary)] mb-0.5">
+                              {currentSport === 'basketball' ? (m === "O210.5" ? "Over 210.5 Pts" : "Under 210.5 Pts") : currentSport === 'tennis' ? (m === "O22.5" ? "Over 22.5 Games" : "Under 22.5 Games") : MARKET_LABELS[m]}
+                            </div>
+                            {fixture.odds[m]}
+                          </button>
+                        ))}
+                      </div>
+                    </details>
+                  </>
+                )}
               </div>
             ))}
           </div>
@@ -359,8 +403,8 @@ function SportsbookPage() {
                       <div className="space-y-2">
                         {bet.slip.map((leg, idx) => (
                           <div key={idx} className="bg-[var(--bg-secondary)] p-2 rounded text-sm">
-                            <div className="text-[var(--text-secondary)] mb-1">{leg.home} vs {leg.away}</div>
-                            <div className="font-bold">{getMarketLabel(leg.market, leg.home, leg.away)} @ {leg.odds}</div>
+                            <div className="text-[var(--text-secondary)] mb-1">{leg.away ? `${leg.home} vs ${leg.away}` : leg.home}</div>
+                            <div className="font-bold">{leg.market.startsWith('WIN_') ? `To Win (${leg.market.replace('WIN_', '')})` : leg.market.startsWith('PLC_') ? `To Place (${leg.market.replace('PLC_', '')})` : getMarketLabel(leg.market, leg.home, leg.away)} @ {leg.odds}</div>
                           </div>
                         ))}
                       </div>
@@ -390,8 +434,8 @@ function SportsbookPage() {
                       <div className="space-y-2">
                         {bet.slip.map((leg, idx) => (
                           <div key={idx} className="bg-[var(--bg-secondary)] p-2 rounded text-sm opacity-80">
-                            <div className="text-[var(--text-secondary)] mb-1">{leg.home} vs {leg.away}</div>
-                            <div className="font-bold">{getMarketLabel(leg.market, leg.home, leg.away)} @ {leg.odds}</div>
+                            <div className="text-[var(--text-secondary)] mb-1">{leg.away ? `${leg.home} vs ${leg.away}` : leg.home}</div>
+                            <div className="font-bold">{leg.market.startsWith('WIN_') ? `To Win (${leg.market.replace('WIN_', '')})` : leg.market.startsWith('PLC_') ? `To Place (${leg.market.replace('PLC_', '')})` : getMarketLabel(leg.market, leg.home, leg.away)} @ {leg.odds}</div>
                           </div>
                         ))}
                       </div>
@@ -479,10 +523,10 @@ function SportsbookPage() {
                     <div className="flex justify-between items-start">
                       <div>
                         <p className="text-xs text-[var(--text-secondary)]">
-                          {bet.home} vs {bet.away}
+                          {bet.away ? `${bet.home} vs ${bet.away}` : bet.home}
                         </p>
                         <p className="text-sm font-semibold">
-                          {getMarketLabel(bet.market, bet.home, bet.away)}
+                          {bet.market.startsWith('WIN_') ? `To Win (${bet.market.replace('WIN_', '')})` : bet.market.startsWith('PLC_') ? `To Place (${bet.market.replace('PLC_', '')})` : getMarketLabel(bet.market, bet.home, bet.away)}
                         </p>
                       </div>
                       <div className="flex items-center gap-2">

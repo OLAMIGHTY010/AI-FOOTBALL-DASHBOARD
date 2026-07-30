@@ -17,6 +17,8 @@ from ut import open_pack, PACKS, get_sell_value
 from tactics import get_tactics_data, FORMATIONS, TACTICAL_STYLES
 from fpl import get_fpl_data, optimize_fpl_squad
 from fpl_uefa import get_uefa_data, optimize_uefa_squad
+from data_racing import get_random_runners
+from simulation_racing import calculate_racing_odds, simulate_race
 
 app = FastAPI(title="AI Football Dashboard API")
 
@@ -36,6 +38,7 @@ for league, teams in VIRTUAL_TEAMS.items():
         standings[league][team] = {"P": 0, "W": 0, "D": 0, "L": 0, "GF": 0, "GA": 0, "GD": 0, "Pts": 0}
 
 current_fixtures = []
+current_racing_fixtures = []
 
 
 class BetRequest(BaseModel):
@@ -47,6 +50,7 @@ class BetRequest(BaseModel):
 
 class SimulateRequest(BaseModel):
     fixture_ids: Optional[List[str]] = None
+    sport: Optional[str] = "football"
 
 
 class PackRequest(BaseModel):
@@ -131,6 +135,39 @@ def get_basketball_fixtures():
     fixtures = generate_basketball_fixtures(VIRTUAL_BASKETBALL_TEAMS)
     return {"fixtures": fixtures}
 
+@app.get("/api/fixtures/racing")
+def get_racing_fixtures():
+    global current_racing_fixtures
+    if not current_racing_fixtures:
+        runners = get_random_runners(8)
+        runners = calculate_racing_odds(runners)
+        current_racing_fixtures = [{
+            "id": f"race_{uuid.uuid4().hex[:8]}",
+            "name": "Virtual Derby - 1000m Sprint",
+            "runners": runners
+        }]
+    return {"fixtures": current_racing_fixtures}
+
+@app.post("/api/simulate/racing")
+def simulate_racing_match(req: SimulateRequest):
+    global current_racing_fixtures
+    if not current_racing_fixtures:
+        return {"results": []}
+    
+    race = current_racing_fixtures[0]
+    results = simulate_race(race.get("runners", []))
+    
+    # Generate next race
+    runners = get_random_runners(8)
+    runners = calculate_racing_odds(runners)
+    current_racing_fixtures = [{
+        "id": f"race_{uuid.uuid4().hex[:8]}",
+        "name": "Virtual Derby - 1000m Sprint",
+        "runners": runners
+    }]
+    
+    return {"results": [results], "next_fixtures": current_racing_fixtures}
+
 @app.post("/api/simulate/basketball")
 def simulate_basketball_matches():
     fixtures = generate_basketball_fixtures(VIRTUAL_BASKETBALL_TEAMS)
@@ -172,6 +209,20 @@ def get_all_standings():
 @app.post("/api/simulate")
 def run_simulation(req: SimulateRequest):
     global current_fixtures, standings
+    sport = req.sport
+    selected_fixtures = current_fixtures if not req.fixture_ids else [f for f in current_fixtures if f["id"] in req.fixture_ids]
+    
+    if sport == "basketball":
+        results = [simulate_basketball_match(f) for f in selected_fixtures]
+        return {"sport": "basketball", "results": results}
+        
+    if sport == "tennis":
+        results = [simulate_tennis_match(f) for f in selected_fixtures]
+        return {"sport": "tennis", "results": results}
+        
+    if sport == "racing":
+        return {"error": "Use /api/simulate/racing instead for racing"}
+
     if not current_fixtures:
         current_fixtures = generate_fixtures()
 
@@ -214,7 +265,7 @@ def run_simulation(req: SimulateRequest):
 
         results.append(match_result)
 
-    # Generate new fixtures for next gameweek
+    # Generate Virtual Fixtures for other sports for next gameweek
     current_fixtures = generate_fixtures()
 
     return {"results": results, "next_fixtures": current_fixtures}

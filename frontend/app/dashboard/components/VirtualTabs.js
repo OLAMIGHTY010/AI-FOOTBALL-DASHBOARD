@@ -40,6 +40,12 @@ function VirtualTabsContent() {
         >
           🎾 Tennis
         </Link>
+        <Link 
+          href={`${pathname}?sport=racing`}
+          className={`px-6 py-2 rounded-lg font-bold transition-all ${currentSport === 'racing' ? 'bg-[#d82c20] text-white shadow-[0_0_15px_rgba(216,44,32,0.5)]' : 'text-[var(--text-secondary)] hover:text-white'}`}
+        >
+          🐎 Racing
+        </Link>
       </div>
 
       <div className="flex flex-wrap justify-center gap-2 max-w-4xl mx-auto">
@@ -50,7 +56,9 @@ function VirtualTabsContent() {
           if (currentSport === 'basketball') {
             activeClass = 'bg-[#ff7b00] text-black shadow-[0_0_15px_rgba(255,123,0,0.5)]';
           } else if (currentSport === 'tennis') {
-            activeClass = 'bg-[#c6ff00] text-black shadow-[0_0_15px_rgba(198,255,0,0.5)]';
+            activeClass = 'bg-[#00a86b] text-white shadow-[0_0_15px_rgba(0,168,107,0.5)]';
+          } else if (currentSport === 'racing') {
+            activeClass = 'bg-[#d82c20] text-white shadow-[0_0_15px_rgba(216,44,32,0.5)]';
           }
             
           return (

@@ -100,6 +100,28 @@ def test_tennis_simulate_endpoint():
     assert "a_sets_won" in first_match
     assert "events" in first_match
 
+def test_racing_endpoints():
+    """Test GET /api/fixtures/racing and POST /api/simulate with racing sport."""
+    response = client.get("/api/fixtures/racing")
+    assert response.status_code == 200
+    data = response.json()
+    assert "fixtures" in data
+    assert len(data["fixtures"]) > 0
+    
+    fixture_id = data["fixtures"][0]["id"]
+    
+    # POST to /api/simulate/racing to simulate it
+    sim_response = client.post("/api/simulate/racing", json={"sport": "racing"})
+    assert sim_response.status_code == 200
+    sim_data = sim_response.json()
+    assert "results" in sim_data
+    assert len(sim_data["results"]) > 0
+    
+    race_result = sim_data["results"][0]
+    assert "events" in race_result
+    assert "standings" in race_result
+    assert len(race_result["standings"]) > 0
+
 
 def test_existing_endpoints():
     """Test pre-existing endpoints for complete backend coverage."""
