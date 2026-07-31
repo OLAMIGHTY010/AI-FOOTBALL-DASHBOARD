@@ -3,6 +3,9 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import FPLChat from "./components/FPLChat";
 import FPLLeagues from "./components/FPLLeagues";
+import FPLTransfers from "./components/FPLTransfers";
+import FPLLive from "./components/FPLLive";
+import PlayerProfileModal from "./components/PlayerProfileModal";
 
 const API_URL = "http://localhost:8000";
 
@@ -18,16 +21,23 @@ export default function FPLPage() {
   const [formation, setFormation] = useState("3-4-3");
   const [optimizing, setOptimizing] = useState(false);
   
+  const [activeChip, setActiveChip] = useState(null);
+  const [selectedProfilePlayer, setSelectedProfilePlayer] = useState(null);
+  
   const [selectedPlayerId, setSelectedPlayerId] = useState(null);
   
   // Database filter state
   const [searchTerm, setSearchTerm] = useState("");
   const [posFilter, setPosFilter] = useState("ALL");
   
-  // Squad state
+  // Squad and Team state
   const [squad, setSquad] = useState(null);
+  const [teamData, setTeamData] = useState(null);
+  const [needsOnboarding, setNeedsOnboarding] = useState(false);
+  const [newTeamName, setNewTeamName] = useState("");
   const [punditReport, setPunditReport] = useState(null);
   const [reportLoading, setReportLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   const fetchPunditReport = async () => {
     setReportLoading(true);
@@ -50,12 +60,62 @@ export default function FPLPage() {
     setReportLoading(false);
   };
 
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-    });
+  const fetchTeamData = async (currentSession) => {
+    if (competition === "epl" && currentSession) {
+      try {
+        const headers = { "Authorization": `Bearer ${currentSession.access_token}` };
+        const teamRes = await fetch(`${API_URL}/api/v1/team/me`, { headers });
+        if (teamRes.ok) {
+          const tData = await teamRes.json();
+          setTeamData(tData);
+          setBudget(tData.bank_balance);
+          
+          const squadRes = await fetch(`${API_URL}/api/v1/team/${tData.id}/squad/1`, { headers });
+          if (squadRes.ok) {
+            const sData = await squadRes.json();
+            if (sData.snapshot) {
+              setActiveChip(sData.snapshot.active_chip);
+            }
+            if (sData.picks && sData.picks.length === 15) {
+              const starters = sData.picks.filter(p => p.position_order <= 11).map(p => ({
+                ...p.players,
+                is_captain: p.is_captain,
+                is_vice_captain: p.is_vice_captain
+              }));
+              const bench = sData.picks.filter(p => p.position_order > 11).map(p => ({
+                ...p.players,
+                is_captain: p.is_captain,
+                is_vice_captain: p.is_vice_captain
+              }));
+              const cap = starters.find(p => p.is_captain) || starters[0];
+              const vice = starters.find(p => p.is_vice_captain) || starters[1];
+              
+              setSquad({
+                starting_eleven: starters,
+                bench: bench,
+                captain: cap,
+                vice_captain: vice,
+                total_expected_points: 0
+              });
+              return;
+            }
+          }
+        } else if (teamRes.status === 404) {
+          setNeedsOnboarding(true);
+          return;
+        }
+      } catch (err) {
+        console.error("Failed to load from DB", err);
+      }
+    }
+    setSquad(JSON.parse(localStorage.getItem(`fpl_squad_${competition}`) || "null"));
+  };
 
-    const fetchFpl = async () => {
+  useEffect(() => {
+    const init = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setSession(session);
+      
       setLoading(true);
       try {
         const endpoint = competition === "epl" ? `${API_URL}/api/fpl/data` : `${API_URL}/api/uefa/data?competition=${competition}`;
@@ -66,33 +126,103 @@ export default function FPLPage() {
         console.error(`Failed to load ${competition} data`, err);
       }
       setLoading(false);
+      
+      await fetchTeamData(session);
     };
-    fetchFpl();
     
-    // Load from local storage if exists
-    setSquad(JSON.parse(localStorage.getItem(`fpl_squad_${competition}`) || "null"));
+    init();
   }, [competition]);
+
+  const handleCreateTeam = async (e) => {
+    e.preventDefault();
+    if (!newTeamName.trim()) return;
+    setSaving(true);
+    try {
+      const headers = { 
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${session.access_token}`
+      };
+      const res = await fetch(`${API_URL}/api/v1/team/create`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ team_name: newTeamName })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setTeamData(data);
+        setNeedsOnboarding(false);
+        alert("Team created successfully! Now use the AI Optimizer or search players to build your squad.");
+      } else {
+        alert("Failed to create team: " + data.detail);
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error creating team.");
+    }
+    setSaving(false);
+  };
 
   const saveSquadLocally = async (newSquad) => {
     setSquad(newSquad);
     localStorage.setItem(`fpl_squad_${competition}`, JSON.stringify(newSquad));
+    // Kept local storage as a cache
+  };
 
-    // Sync to fpl_scores in Supabase
-    if (session) {
-      const gwPoints = newSquad.starting_eleven.reduce((acc, p) => {
-        let pts = p.live_points || 0;
-        if (newSquad.captain && newSquad.captain.id === p.id) pts *= 2;
-        return acc + pts;
-      }, 0);
-
-      await supabase.from("fpl_scores").upsert({
-        user_id: session.user.id,
-        email: session.user.email,
-        total_points: newSquad.total_expected_points + gwPoints,
-        gw_points: gwPoints,
-        updated_at: new Date()
+  const saveLineupToDb = async () => {
+    if (!squad) return;
+    setSaving(true);
+    try {
+      // Map squad to DB picks format
+      let picks = [];
+      squad.starting_eleven.forEach((p, index) => {
+        picks.push({
+          player_id: p.id,
+          position_order: index + 1,
+          is_captain: squad.captain?.id === p.id,
+          is_vice_captain: squad.vice_captain?.id === p.id
+        });
       });
+      squad.bench.forEach((p, index) => {
+        picks.push({
+          player_id: p.id,
+          position_order: 12 + index,
+          is_captain: false,
+          is_vice_captain: false
+        });
+      });
+
+      const payload = {
+        gameweek_id: 1,
+        picks: picks
+      };
+
+      const headers = { 
+        "Content-Type": "application/json" 
+      };
+      
+      if (session) {
+        headers["Authorization"] = `Bearer ${session.access_token}`;
+      }
+      
+      const targetTeamId = teamData ? teamData.id : 1;
+
+      const res = await fetch(`${API_URL}/api/v1/team/${targetTeamId}/lineup`, {
+        method: "PUT",
+        headers: headers,
+        body: JSON.stringify(payload)
+      });
+      
+      const data = await res.json();
+      if (res.ok) {
+        alert("Lineup successfully saved to Database!");
+      } else {
+        alert("Failed to save: " + data.detail);
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error saving lineup to DB.");
     }
+    setSaving(false);
   };
 
   const runOptimizer = async () => {
@@ -123,6 +253,27 @@ export default function FPLPage() {
       console.error(err);
     }
     setOptimizing(false);
+  };
+
+  const playChip = async (chipName) => {
+    if (!session || !teamData) return;
+    if (!confirm(`Are you sure you want to activate ${chipName}?`)) return;
+    try {
+      const res = await fetch(`${API_URL}/api/v1/team/${teamData.id}/activate-chip`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session.access_token}` },
+        body: JSON.stringify({ gameweek_id: 1, chip_name: chipName })
+      });
+      if (res.ok) {
+        alert(chipName + " Activated!");
+        fetchTeamData(session);
+      } else {
+        const d = await res.json();
+        alert("Failed to activate chip: " + d.detail);
+      }
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   const handlePlayerClick = (playerId) => {
@@ -250,6 +401,13 @@ export default function FPLPage() {
         onClick={() => handlePlayerClick(p.id)}
         className={`relative flex flex-col items-center justify-center cursor-pointer transition-transform hover:scale-105 mx-1 ${isSelected ? 'ring-4 ring-yellow-400 rounded-lg scale-110 z-30' : ''}`}
       >
+        <button 
+          onClick={(e) => { e.stopPropagation(); setSelectedProfilePlayer(p); }}
+          className="absolute -top-2 -left-2 w-5 h-5 bg-blue-500 text-white rounded-full text-xs font-bold flex items-center justify-center z-40 shadow-lg hover:bg-blue-400"
+          title="View Player Profile"
+        >
+          i
+        </button>
         <img 
           src={p.photo || "https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_0-66.webp"}
           alt={p.name}
@@ -258,7 +416,12 @@ export default function FPLPage() {
         />
         <div className="bg-[#37003c] rounded-t w-full px-1 py-0.5 text-center mt-1 z-20">
           <div className="text-[10px] font-bold text-white whitespace-nowrap overflow-hidden text-ellipsis w-full flex items-center justify-center gap-1">
-            {p.name.split(' ').pop()} {isCaptain && <span className="w-3 h-3 bg-white text-[#37003c] rounded-full flex items-center justify-center font-black text-[8px]">C</span>}
+            {p.name.split(' ').pop()} 
+            {isCaptain && (
+              <span className={`w-3 h-3 rounded-full flex items-center justify-center font-black text-[7px] ${activeChip === "TRIPLE_CAPTAIN" ? "bg-purple-500 text-white" : "bg-white text-[#37003c]"}`}>
+                {activeChip === "TRIPLE_CAPTAIN" ? "TC" : "C"}
+              </span>
+            )}
           </div>
         </div>
         <div className="bg-[#00ff87] rounded-b w-full px-1 py-0.5 text-center text-[#37003c] z-20 shadow-lg">
@@ -268,8 +431,39 @@ export default function FPLPage() {
     );
   };
 
+  if (needsOnboarding) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh]">
+        <div className="glass-card max-w-md w-full p-8 text-center">
+          <div className="text-4xl mb-4">🏆</div>
+          <h2 className="text-2xl font-bold mb-2">Welcome to FPL Dashboard!</h2>
+          <p className="text-[var(--text-secondary)] mb-6">
+            It looks like you don't have a virtual team set up yet. What would you like to call your squad?
+          </p>
+          <form onSubmit={handleCreateTeam} className="flex flex-col gap-4">
+            <input 
+              type="text" 
+              placeholder="e.g. AFC Richmond"
+              className="input-field py-3 text-center text-lg"
+              value={newTeamName}
+              onChange={e => setNewTeamName(e.target.value)}
+              required
+            />
+            <button 
+              type="submit" 
+              disabled={saving}
+              className="btn-primary py-3 font-bold text-lg rounded-xl"
+            >
+              {saving ? "Creating..." : "Create My Team"}
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="animate-fade-in max-w-7xl mx-auto pb-12">
+    <div className="space-y-6 animate-fade-in max-w-7xl mx-auto pb-12 relative">
       <div className="text-center mb-6">
         <h1 className="text-3xl font-bold mb-2">
           {competition === "epl" ? "🦁 FPL AI Predictor" : competition === "ucl" ? "⭐️ UCL Fantasy AI" : competition === "uel" ? "🌍 UEL Fantasy AI" : "🟢 UECL Fantasy AI"}
@@ -297,16 +491,25 @@ export default function FPLPage() {
         </button>
       </div>
 
-      {/* Tabs */}
-      <div className="flex flex-wrap justify-center gap-2 mb-6 max-w-4xl mx-auto">
-        <button onClick={() => setActiveTab("transfers")} className={`px-4 py-2 rounded font-bold ${activeTab === 'transfers' ? 'bg-[var(--accent-primary)] text-black' : 'bg-[var(--bg-card)]'}`}>
-          🔄 Player Database
+      {/* Top Nav */}
+      <div className="flex flex-wrap gap-2 mb-8 glass-card p-2 rounded-xl sticky top-2 z-50 shadow-lg border border-[var(--border-color)]">
+        <button onClick={() => setActiveTab("transfers")} className={`px-4 py-2 rounded font-bold transition-colors ${activeTab === 'transfers' ? 'bg-[var(--accent-primary)] text-black' : 'bg-[var(--bg-card)] hover:bg-white/5'}`}>
+          🔄 Transfers
         </button>
-        <button onClick={() => setActiveTab("ai")} className={`px-4 py-2 rounded font-bold ${activeTab === 'ai' ? 'bg-[var(--accent-primary)] text-black' : 'bg-[var(--bg-card)]'}`}>
+        <button onClick={() => setActiveTab("live")} className={`px-4 py-2 rounded font-bold transition-colors ${activeTab === 'live' ? 'bg-red-500 text-white' : 'bg-[var(--bg-card)] hover:bg-white/5'}`}>
+          📡 Live
+        </button>
+        <button onClick={() => setActiveTab("ai")} className={`px-4 py-2 rounded font-bold transition-colors ${activeTab === 'ai' ? 'bg-[var(--accent-primary)] text-black' : 'bg-[var(--bg-card)] hover:bg-white/5'}`}>
           🤖 AI Optimizer
         </button>
         <button onClick={() => setActiveTab("team")} className={`px-4 py-2 rounded font-bold ${activeTab === 'team' ? 'bg-[var(--accent-primary)] text-black' : 'bg-[var(--bg-card)]'}`}>
           👔 My Team
+        </button>
+        <button onClick={() => setActiveTab("leagues")} className={`px-4 py-2 rounded font-bold ${activeTab === 'leagues' ? 'bg-[var(--accent-primary)] text-black' : 'bg-[var(--bg-card)]'}`}>
+          🏆 Leagues
+        </button>
+        <button onClick={() => setActiveTab("chat")} className={`px-4 py-2 rounded font-bold ${activeTab === 'chat' ? 'bg-[var(--accent-primary)] text-black' : 'bg-[var(--bg-card)]'}`}>
+          💬 AI Chat
         </button>
       </div>
 
@@ -314,59 +517,24 @@ export default function FPLPage() {
 
       {/* Transfers / Database */}
       {!loading && activeTab === "transfers" && (
-        <div className="glass-card">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="font-bold text-lg">Player Database</h2>
-            <div className="flex gap-2">
-              <input 
-                type="text" 
-                placeholder="Search player..." 
-                className="input-field py-1 px-2 text-sm"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-              <select 
-                className="select-field py-1 px-2 text-sm"
-                value={posFilter}
-                onChange={(e) => setPosFilter(e.target.value)}
-              >
-                <option value="ALL">All Pos</option>
-                <option value="GK">GK</option>
-                <option value="DEF">DEF</option>
-                <option value="MID">MID</option>
-                <option value="FWD">FWD</option>
-              </select>
-            </div>
-          </div>
-          <div className="overflow-x-auto max-h-[600px]">
-            <table className="w-full text-sm text-left">
-              <thead className="text-xs text-[var(--text-secondary)] uppercase bg-[var(--bg-secondary)] sticky top-0 z-20">
-                <tr>
-                  <th className="px-4 py-3">Player</th>
-                  <th className="px-4 py-3">Team</th>
-                  <th className="px-4 py-3">Pos</th>
-                  <th className="px-4 py-3">Price</th>
-                  <th className="px-4 py-3">Expected Pts</th>
-                </tr>
-              </thead>
-              <tbody>
-                {players
-                  .filter(p => posFilter === "ALL" || p.position === posFilter)
-                  .filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()))
-                  .slice(0, 100) // limit to 100 for performance
-                  .map((p, i) => (
-                  <tr key={i} className="border-b border-[var(--border-color)]">
-                    <td className="px-4 py-3 font-bold">{p.name}</td>
-                    <td className="px-4 py-3">{p.team}</td>
-                    <td className="px-4 py-3">{p.position}</td>
-                    <td className="px-4 py-3">£{p.price}m</td>
-                    <td className="px-4 py-3 text-[var(--accent-primary)]">{p.expected_points}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <FPLTransfers 
+          squad={squad}
+          teamData={teamData}
+          session={session}
+          players={players}
+          activeChip={activeChip}
+          onTransfersComplete={() => fetchTeamData(session)}
+        />
+      )}
+
+      {/* Live */}
+      {!loading && activeTab === "live" && (
+        <FPLLive 
+          squad={squad}
+          teamData={teamData}
+          session={session}
+          activeChip={activeChip}
+        />
       )}
 
       {/* AI Optimizer */}
@@ -491,12 +659,36 @@ export default function FPLPage() {
                   </div>
                 </div>
 
+                <div className="glass-card mb-4">
+                  <h2 className="font-bold text-lg border-b border-[var(--border-color)] pb-2 mb-4">Power-Ups</h2>
+                  <div className="flex flex-col gap-2">
+                    <button 
+                      onClick={() => playChip("TRIPLE_CAPTAIN")}
+                      disabled={activeChip === "TRIPLE_CAPTAIN"}
+                      className={`w-full py-2 text-xs font-bold rounded transition-colors ${activeChip === "TRIPLE_CAPTAIN" ? 'bg-purple-500 text-white shadow-[0_0_15px_rgba(168,85,247,0.5)]' : 'bg-[var(--bg-card)] border border-[var(--border-color)] hover:bg-white/5'}`}
+                    >
+                      {activeChip === "TRIPLE_CAPTAIN" ? "★ Triple Captain Active" : "Play Triple Captain"}
+                    </button>
+                    <button 
+                      onClick={() => playChip("BENCH_BOOST")}
+                      disabled={activeChip === "BENCH_BOOST"}
+                      className={`w-full py-2 text-xs font-bold rounded transition-colors ${activeChip === "BENCH_BOOST" ? 'bg-emerald-500 text-white shadow-[0_0_15px_rgba(16,185,129,0.5)]' : 'bg-[var(--bg-card)] border border-[var(--border-color)] hover:bg-white/5'}`}
+                    >
+                      {activeChip === "BENCH_BOOST" ? "★ Bench Boost Active" : "Play Bench Boost"}
+                    </button>
+                  </div>
+                </div>
+
                 <div className="glass-card flex flex-col gap-2">
-                   <button className="btn-primary w-full py-2 font-bold flex items-center justify-center gap-2">
-                     🔄 Auto Subs
+                   <button 
+                     className="btn-primary w-full py-2 font-bold flex items-center justify-center gap-2"
+                     onClick={saveLineupToDb}
+                     disabled={saving}
+                   >
+                     {saving ? "⏳ Saving..." : "💾 Save Lineup to Database"}
                    </button>
                    <button className="bg-blue-600 hover:bg-blue-500 text-white w-full py-2 rounded font-bold flex items-center justify-center gap-2 transition-colors">
-                     💰 Team Value (£{squad.total_cost.toFixed(1)}m)
+                     💰 Team Value (£{squad.total_cost ? squad.total_cost.toFixed(1) : "100.0"}m)
                    </button>
                    <button className="bg-purple-600 hover:bg-purple-500 text-white w-full py-2 rounded font-bold flex items-center justify-center gap-2 transition-colors">
                      📅 Gameweek Transfers
@@ -565,6 +757,15 @@ export default function FPLPage() {
             </div>
           )}
         </div>
+      )}
+
+      {/* Modals */}
+      {selectedProfilePlayer && (
+        <PlayerProfileModal 
+          player={selectedProfilePlayer} 
+          session={session} 
+          onClose={() => setSelectedProfilePlayer(null)} 
+        />
       )}
 
       {/* Leagues */}

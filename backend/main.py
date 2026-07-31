@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
@@ -9,6 +9,8 @@ import random
 import string
 import scraper
 from database import supabase
+import engine
+from auth import get_current_user
 from data import VIRTUAL_TEAMS
 from data_basketball import VIRTUAL_BASKETBALL_TEAMS
 from simulation import generate_fixtures, simulate_match, check_bet_result, calculate_all_odds
@@ -603,47 +605,273 @@ def fpl_entry(entry_id: int):
 def fpl_entry_history(entry_id: int):
     return get_fpl_entry_history(entry_id)
 
-# --- Real Supabase Endpoints ---
+# --- League Management Endpoints ---
 class CreateLeagueRequest(BaseModel):
     name: str
     type: str = "CLASSIC"
     privacy: str = "PRIVATE"
-    admin_team_id: Optional[int] = None
+
+class JoinLeagueRequest(BaseModel):
+    invite_code: str
+
+def get_user_team_id(user):
+    fpl_user_resp = supabase.table("fpl_users").select("id").eq("auth_id", user.id).execute()
+    if not fpl_user_resp.data:
+        raise HTTPException(status_code=404, detail="No user found")
+    team_resp = supabase.table("virtual_teams").select("id").eq("user_id", fpl_user_resp.data[0]["id"]).execute()
+    if not team_resp.data:
+        raise HTTPException(status_code=404, detail="No virtual team found")
+    return team_resp.data[0]["id"]
 
 @app.post("/api/v1/leagues")
-def create_league(req: CreateLeagueRequest):
-    if not supabase:
-        raise HTTPException(status_code=500, detail="Database not configured")
-    
+def create_league(req: CreateLeagueRequest, user = Depends(get_current_user)):
+    team_id = get_user_team_id(user)
     invite_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
     
     try:
-        data, count = supabase.table("leagues").insert({
+        # 1. Create League
+        res = supabase.table("leagues").insert({
             "name": req.name,
             "type": req.type,
             "privacy": req.privacy,
-            "admin_team_id": req.admin_team_id,
+            "admin_team_id": team_id,
             "invite_code": invite_code,
             "start_gameweek_id": 1
         }).execute()
-        return {"success": True, "league": data[1][0] if len(data) > 1 and len(data[1]) > 0 else None, "invite_code": invite_code}
+        
+        league = res.data[0]
+        
+        # 2. Add creator to league_entries
+        supabase.table("league_entries").insert({
+            "league_id": league["id"],
+            "virtual_team_id": team_id
+        }).execute()
+        
+        return {"success": True, "league": league, "invite_code": invite_code}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/api/v1/leagues/join")
+def join_league(req: JoinLeagueRequest, user = Depends(get_current_user)):
+    team_id = get_user_team_id(user)
+    
+    try:
+        # 1. Find League by invite_code
+        league_resp = supabase.table("leagues").select("*").eq("invite_code", req.invite_code).execute()
+        if not league_resp.data:
+            raise HTTPException(status_code=404, detail="Invalid invite code")
+        
+        league = league_resp.data[0]
+        
+        # 2. Check if already in league
+        entry_resp = supabase.table("league_entries").select("*").eq("league_id", league["id"]).eq("virtual_team_id", team_id).execute()
+        if entry_resp.data:
+            raise HTTPException(status_code=400, detail="Already a member of this league")
+            
+        # 3. Add to league
+        supabase.table("league_entries").insert({
+            "league_id": league["id"],
+            "virtual_team_id": team_id
+        }).execute()
+        
+        return {"success": True, "league": league}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.get("/api/v1/team/me/leagues")
+def get_my_leagues(user = Depends(get_current_user)):
+    team_id = get_user_team_id(user)
+    try:
+        # Join league_entries with leagues
+        res = supabase.table("league_entries").select("*, leagues(*)").eq("virtual_team_id", team_id).execute()
+        return res.data
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 @app.get("/api/v1/leagues/{league_id}")
-def get_league(league_id: int):
-    if not supabase:
-        raise HTTPException(status_code=500, detail="Database not configured")
-        
+def get_league(league_id: int, user = Depends(get_current_user)):
     try:
-        response = supabase.table("leagues").select("*").eq("id", league_id).execute()
-        if len(response.data) == 0:
+        league_resp = supabase.table("leagues").select("*").eq("id", league_id).execute()
+        if not league_resp.data:
             raise HTTPException(status_code=404, detail="League not found")
-        return response.data[0]
+            
+        league = league_resp.data[0]
+        
+        # Get standings by joining league_entries with virtual_teams and fpl_users
+        standings_resp = supabase.table("league_entries").select(
+            "*, virtual_teams(id, name, fpl_users(username))"
+        ).eq("league_id", league_id).execute()
+        
+        standings = standings_resp.data
+        # Sort standings depending on league type
+        if league["type"] == "CLASSIC":
+            standings.sort(key=lambda x: x["total_points"], reverse=True)
+        elif league["type"] == "H2H":
+            standings.sort(key=lambda x: (x["h2h_points"], x["total_points"]), reverse=True)
+            
+        return {
+            "league": league,
+            "standings": standings
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/api/v1/leagues/{league_id}/generate-fixtures")
+def generate_fixtures(league_id: int, user = Depends(get_current_user)):
+    try:
+        # Get league
+        league_resp = supabase.table("leagues").select("*").eq("id", league_id).execute()
+        if not league_resp.data:
+            raise HTTPException(status_code=404, detail="League not found")
+        league = league_resp.data[0]
+        
+        if league["type"] != "H2H":
+            raise HTTPException(status_code=400, detail="Only H2H leagues have fixture generation")
+            
+        # Get user's team to verify admin
+        fpl_user_resp = supabase.table("fpl_users").select("id").eq("auth_id", user.id).execute()
+        if not fpl_user_resp.data:
+            raise HTTPException(status_code=404, detail="User not found")
+        fpl_user_id = fpl_user_resp.data[0]["id"]
+        
+        team_resp = supabase.table("virtual_teams").select("id").eq("user_id", fpl_user_id).execute()
+        if not team_resp.data:
+            raise HTTPException(status_code=404, detail="Team not found")
+        team_id = team_resp.data[0]["id"]
+        
+        if league["admin_team_id"] != team_id:
+            raise HTTPException(status_code=403, detail="Only the league admin can generate fixtures")
+            
+        # Check if already generated
+        matches_resp = supabase.table("h2h_matches").select("id").eq("league_id", league_id).limit(1).execute()
+        if matches_resp.data and len(matches_resp.data) > 0:
+            raise HTTPException(status_code=400, detail="Fixtures have already been generated for this league")
+            
+        # Get entries
+        entries_resp = supabase.table("league_entries").select("virtual_team_id").eq("league_id", league_id).execute()
+        team_ids = [e["virtual_team_id"] for e in entries_resp.data]
+        
+        if len(team_ids) < 2:
+            raise HTTPException(status_code=400, detail="Need at least 2 teams to generate fixtures")
+            
+        if len(team_ids) % 2 != 0:
+            raise HTTPException(status_code=400, detail="Need an even number of teams to generate fixtures (no ghost teams allowed)")
+            
+        start_gw = league["start_gameweek_id"] or 1
+        total_gws = 38 - start_gw + 1
+        
+        # Circle Method algorithm
+        n = len(team_ids)
+        fixed = team_ids[0]
+        rotating = team_ids[1:]
+        rounds = n - 1
+        
+        matches_to_insert = []
+        for gw_offset in range(total_gws):
+            round_idx = gw_offset % rounds
+            gw_id = start_gw + gw_offset
+            
+            # Rotate
+            current_rotating = rotating[-round_idx:] + rotating[:-round_idx]
+            
+            # Match 1
+            if round_idx % 2 == 0:
+                matches_to_insert.append({"league_id": league_id, "gameweek_id": gw_id, "team_a_id": fixed, "team_b_id": current_rotating[0]})
+            else:
+                matches_to_insert.append({"league_id": league_id, "gameweek_id": gw_id, "team_a_id": current_rotating[0], "team_b_id": fixed})
+                
+            # Other matches
+            for i in range(1, n // 2):
+                t1 = current_rotating[i]
+                t2 = current_rotating[n - 1 - i]
+                if round_idx % 2 == 0:
+                    matches_to_insert.append({"league_id": league_id, "gameweek_id": gw_id, "team_a_id": t1, "team_b_id": t2})
+                else:
+                    matches_to_insert.append({"league_id": league_id, "gameweek_id": gw_id, "team_a_id": t2, "team_b_id": t1})
+                    
+        supabase.table("h2h_matches").insert(matches_to_insert).execute()
+        return {"success": True, "message": f"Generated {len(matches_to_insert)} matches"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.get("/api/v1/leagues/{league_id}/fixtures")
+def get_league_fixtures(league_id: int):
+    try:
+        # Join with virtual_teams to get team names
+        matches_resp = supabase.table("h2h_matches").select(
+            "*, team_a:team_a_id(id, name), team_b:team_b_id(id, name)"
+        ).eq("league_id", league_id).order("gameweek_id").execute()
+        
+        return matches_resp.data
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 # --- Squad Management Endpoints ---
+
+class TeamCreateRequest(BaseModel):
+    team_name: str
+
+@app.get("/api/v1/team/me")
+def get_my_team(user = Depends(get_current_user)):
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Database not configured")
+    try:
+        fpl_user_resp = supabase.table("fpl_users").select("*").eq("auth_id", user.id).execute()
+        if not fpl_user_resp.data:
+            raise HTTPException(status_code=404, detail="No team found for user")
+        
+        fpl_user_id = fpl_user_resp.data[0]["id"]
+        team_resp = supabase.table("virtual_teams").select("*").eq("user_id", fpl_user_id).execute()
+        if not team_resp.data:
+            raise HTTPException(status_code=404, detail="No virtual team found")
+            
+        return team_resp.data[0]
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/api/v1/team/create")
+def create_my_team(req: TeamCreateRequest, user = Depends(get_current_user)):
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Database not configured")
+    try:
+        fpl_user_resp = supabase.table("fpl_users").select("*").eq("auth_id", user.id).execute()
+        
+        if not fpl_user_resp.data:
+            username = user.email.split("@")[0] + "_" + user.id[:4] if user.email else "user_" + user.id[:8]
+            new_user = {
+                "auth_id": user.id,
+                "email": user.email or f"{user.id}@placeholder.com",
+                "username": username
+            }
+            res = supabase.table("fpl_users").insert(new_user).execute()
+            fpl_user_id = res.data[0]["id"]
+        else:
+            fpl_user_id = fpl_user_resp.data[0]["id"]
+            
+        team_resp = supabase.table("virtual_teams").select("*").eq("user_id", fpl_user_id).execute()
+        if team_resp.data:
+            raise HTTPException(status_code=400, detail="User already has a team")
+            
+        new_team = {
+            "user_id": fpl_user_id,
+            "name": req.team_name,
+            "bank_balance": 100.0,
+            "free_transfers": 1,
+            "total_points": 0
+        }
+        create_res = supabase.table("virtual_teams").insert(new_team).execute()
+        return create_res.data[0]
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 class TransferRequest(BaseModel):
     gameweek_id: int
@@ -661,20 +889,37 @@ class LineupRequest(BaseModel):
     gameweek_id: int
     picks: List[Pick]
 
-@app.get("/api/v1/team/{team_id}")
-def get_team(team_id: int):
+def verify_team_ownership(team_id: int, user):
     if not supabase:
         raise HTTPException(status_code=500, detail="Database not configured")
     try:
-        response = supabase.table("virtual_teams").select("*").eq("id", team_id).execute()
+        # Fetch team and join with fpl_users to get the auth_id (UUID)
+        response = supabase.table("virtual_teams").select("*, fpl_users(auth_id)").eq("id", team_id).execute()
         if not response.data:
             raise HTTPException(status_code=404, detail="Team not found")
-        return response.data[0]
+        
+        team = response.data[0]
+        fpl_user = team.get("fpl_users")
+        
+        # Verify Ownership
+        if not fpl_user or fpl_user.get("auth_id") != user.id:
+            raise HTTPException(status_code=403, detail="Forbidden: You do not own this team")
+            
+        return team
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+@app.get("/api/v1/team/{team_id}")
+def get_team(team_id: int, user = Depends(get_current_user)):
+    team = verify_team_ownership(team_id, user)
+    return team
+
 @app.get("/api/v1/team/{team_id}/squad/{gameweek_id}")
-def get_squad(team_id: int, gameweek_id: int):
+def get_squad(team_id: int, gameweek_id: int, user = Depends(get_current_user)):
+    verify_team_ownership(team_id, user)
+    
     if not supabase:
         raise HTTPException(status_code=500, detail="Database not configured")
     try:
@@ -695,25 +940,271 @@ def get_squad(team_id: int, gameweek_id: int):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@app.post("/api/v1/team/{team_id}/transfers")
-def submit_transfers(team_id: int, req: TransferRequest):
+@app.get("/api/v1/team/{team_id}/h2h-matchup/{gameweek_id}")
+def get_live_h2h_matchup(team_id: int, gameweek_id: int, user = Depends(get_current_user)):
+    verify_team_ownership(team_id, user)
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Database not configured")
+        
+    try:
+        # Fetch the matchup for this team and gameweek
+        # A team can be either team_a or team_b
+        # Note: supabase Python client doesn't support complex OR filters easily via standard eq().
+        # We can fetch both and combine, or just fetch where gameweek_id = X and filter in Python since it's small.
+        # But wait, there is `.or_("team_a_id.eq.X,team_b_id.eq.X")` if using postgrest syntax!
+        
+        matches_resp = supabase.table("h2h_matches").select(
+            "*, team_a:team_a_id(id, name), team_b:team_b_id(id, name)"
+        ).eq("gameweek_id", gameweek_id).or_(f"team_a_id.eq.{team_id},team_b_id.eq.{team_id}").execute()
+        
+        if not matches_resp.data:
+            return {"matchup": None}
+            
+        match = matches_resp.data[0]
+        
+        # Calculate live simulated score for team_a
+        # Fetch snapshot for team_a
+        snap_a = supabase.table("squad_snapshots").select("gameweek_points, transfer_cost").eq("virtual_team_id", match["team_a_id"]).eq("gameweek_id", gameweek_id).execute()
+        pts_a = snap_a.data[0]["gameweek_points"] if snap_a.data else 0
+        hits_a = snap_a.data[0]["transfer_cost"] if snap_a.data else 0
+        live_a = pts_a - hits_a
+        
+        # Calculate live simulated score for team_b
+        snap_b = supabase.table("squad_snapshots").select("gameweek_points, transfer_cost").eq("virtual_team_id", match["team_b_id"]).eq("gameweek_id", gameweek_id).execute()
+        pts_b = snap_b.data[0]["gameweek_points"] if snap_b.data else 0
+        hits_b = snap_b.data[0]["transfer_cost"] if snap_b.data else 0
+        live_b = pts_b - hits_b
+        
+        match["live_score_a"] = live_a
+        match["live_score_b"] = live_b
+        
+        return {"matchup": match}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.get("/api/v1/players/{player_id}/profile")
+def get_player_profile(player_id: int, user = Depends(get_current_user)):
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Database not configured")
+        
+    try:
+        player_resp = supabase.table("players").select("*, real_teams(name, short_name)").eq("id", player_id).execute()
+        if not player_resp.data:
+            raise HTTPException(status_code=404, detail="Player not found")
+            
+        player = player_resp.data[0]
+        
+        # Mock 5-week form (historical points)
+        import random
+        recent_form = [random.randint(0, 12) for _ in range(5)]
+        
+        # Mock next 5 fixtures (FDR)
+        fdr_opponents = ["ARS (A)", "SHU (H)", "MCI (A)", "LIV (H)", "LUT (A)"]
+        fixtures = [{"opp": opp, "fdr": random.randint(1, 5)} for opp in fdr_opponents]
+        
+        # AI Scouting Report
+        adjectives = ["electric", "inconsistent", "reliable", "explosive", "under-the-radar"]
+        ai_report = f"The AI analysis engine highlights {player['last_name']} as an {random.choice(adjectives)} asset. "
+        
+        avg_form = sum(recent_form) / 5.0
+        if avg_form > 6.0:
+            ai_report += "Currently in spectacular form, they are a must-own for managers looking to climb the ranks."
+        elif avg_form > 3.0:
+            ai_report += "Returning decent points, but upcoming fixtures dictate careful monitoring before a transfer."
+        else:
+            ai_report += "Struggling to find the net recently. Only consider if you are looking for a differential."
+            
+        return {
+            "player": player,
+            "form_history": recent_form,
+            "fixtures": fixtures,
+            "scouting_report": ai_report
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/api/v1/market/simulate-fluctuations")
+def simulate_market_fluctuations(user = Depends(get_current_user)):
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Database not configured")
+        
+    try:
+        # Fetch all players
+        players_resp = supabase.table("players").select("id, current_price, selected_by_percent").execute()
+        players = players_resp.data
+        
+        import random
+        
+        updates = []
+        for p in players:
+            ownership = float(p.get("selected_by_percent") or 0.0)
+            old_price = float(p.get("current_price"))
+            
+            # Fluctuation logic
+            price_change = 0.0
+            
+            # Heavy ownership implies lots of transfers in -> price rises
+            if ownership > 15.0:
+                if random.random() > 0.3: # 70% chance to rise
+                    price_change = 0.1
+            elif ownership > 5.0:
+                if random.random() > 0.8: # 20% chance to rise
+                    price_change = 0.1
+            elif ownership < 2.0:
+                if random.random() > 0.6: # 40% chance to drop
+                    price_change = -0.1
+            
+            # Minor random volatility
+            if price_change == 0.0 and random.random() > 0.95:
+                price_change = random.choice([0.1, -0.1])
+                
+            new_price = old_price + price_change
+            
+            if price_change != 0.0:
+                updates.append({
+                    "id": p["id"],
+                    "current_price": round(new_price, 1)
+                })
+                
+        # Bulk update in Supabase (PostgREST upsert)
+        if updates:
+            supabase.table("players").upsert(updates).execute()
+            
+        return {"status": "success", "message": f"Market updated. {len(updates)} player prices changed."}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+class ChipRequest(BaseModel):
+    gameweek_id: int
+    chip_name: str # WILDCARD, FREE_HIT, TRIPLE_CAPTAIN, BENCH_BOOST
+
+@app.post("/api/v1/team/{team_id}/activate-chip")
+def activate_chip(team_id: int, req: ChipRequest, user = Depends(get_current_user)):
+    verify_team_ownership(team_id, user)
+    
     if not supabase:
         raise HTTPException(status_code=500, detail="Database not configured")
     try:
-        # In a real implementation, you would:
+        # Check if chip already used this season
+        used_resp = supabase.table("squad_snapshots").select("id").eq("virtual_team_id", team_id).eq("active_chip", req.chip_name).execute()
+        if used_resp.data:
+            raise HTTPException(status_code=400, detail=f"{req.chip_name} already played this season")
+            
+        # Update current gameweek snapshot
+        snap_resp = supabase.table("squad_snapshots").select("id").eq("virtual_team_id", team_id).eq("gameweek_id", req.gameweek_id).execute()
+        if not snap_resp.data:
+            raise HTTPException(status_code=404, detail="Squad snapshot not found")
+            
+        supabase.table("squad_snapshots").update({"active_chip": req.chip_name}).eq("id", snap_resp.data[0]["id"]).execute()
+        
+        return {"success": True, "message": f"{req.chip_name} activated!"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/api/v1/team/{team_id}/transfers")
+def submit_transfers(team_id: int, req: TransferRequest, user = Depends(get_current_user)):
+    team = verify_team_ownership(team_id, user)
+    
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Database not configured")
+    try:
+        if len(req.transfers_in) != len(req.transfers_out):
+            raise HTTPException(status_code=400, detail="Transfers in must match transfers out")
+            
+        num_transfers = len(req.transfers_in)
+        if num_transfers == 0:
+            return {"success": True, "message": "No transfers made"}
+            
         # 1. Fetch current team budget and free transfers
+        bank_balance = float(team.get("bank_balance", 0))
+        free_transfers = team.get("free_transfers", 1)
+        
         # 2. Fetch prices of players in and out
+        players_in_resp = supabase.table("players").select("id, current_price").in_("id", req.transfers_in).execute()
+        players_out_resp = supabase.table("players").select("id, current_price").in_("id", req.transfers_out).execute()
+        
+        in_map = {p["id"]: p["current_price"] for p in players_in_resp.data}
+        out_map = {p["id"]: p["current_price"] for p in players_out_resp.data}
+        
+        if len(in_map) != num_transfers or len(out_map) != num_transfers:
+            raise HTTPException(status_code=400, detail="Invalid player IDs provided")
+            
+        total_bought = sum(in_map.values())
+        total_sold = sum(out_map.values())
+        
         # 3. Validate budget constraint
-        # 4. Calculate point deductions (-4 per extra transfer) if wildcard not active
+        new_bank_balance = bank_balance + total_sold - total_bought
+        if new_bank_balance < 0:
+            raise HTTPException(status_code=400, detail=f"Insufficient funds. Short by {-new_bank_balance:.1f}m")
+            
+        # 4. Fetch snapshot to check active chip and update transfer cost
+        snap_resp = supabase.table("squad_snapshots").select("id, transfer_cost, active_chip").eq("virtual_team_id", team_id).eq("gameweek_id", req.gameweek_id).execute()
+        if not snap_resp.data:
+            raise HTTPException(status_code=404, detail="Squad snapshot not found for this gameweek")
+            
+        snapshot = snap_resp.data[0]
+        
+        # Calculate point deductions
+        transfer_cost = 0
+        new_free_transfers = free_transfers
+        is_wildcard_active = req.wildcard_active or snapshot.get("active_chip") in ["WILDCARD", "FREE_HIT"]
+        
+        if not is_wildcard_active:
+            if num_transfers > free_transfers:
+                transfer_cost = (num_transfers - free_transfers) * 4
+                new_free_transfers = 0
+            else:
+                new_free_transfers -= num_transfers
+        else:
+            # If wildcard/free hit, transfers are free and next week gets 1 free transfer.
+            # But we leave free_transfers as is for this prototype (or reset it to 1)
+            transfer_cost = 0
+            new_free_transfers = 1
+                
         # 5. Update team balance and available transfers
-        # 6. Update squad_snapshots and squad_picks
-        # For this prototype, we'll just mock a success response.
-        return {"success": True, "message": f"Processed {len(req.transfers_in)} transfers for Gameweek {req.gameweek_id}"}
+        supabase.table("virtual_teams").update({
+            "bank_balance": new_bank_balance,
+            "free_transfers": new_free_transfers
+        }).eq("id", team_id).execute()
+        
+        new_total_cost = snapshot.get("transfer_cost", 0) + transfer_cost
+        
+        # If wildcard/free hit is active, we completely reset transfer_cost for the gameweek to 0
+        if is_wildcard_active:
+            new_total_cost = 0
+            
+        supabase.table("squad_snapshots").update({
+            "transfer_cost": new_total_cost
+        }).eq("id", snapshot["id"]).execute()
+        
+        # Swap players in squad_picks
+        picks_resp = supabase.table("squad_picks").select("*").eq("squad_snapshot_id", snapshot["id"]).execute()
+        picks = picks_resp.data
+        
+        for p_out, p_in in zip(req.transfers_out, req.transfers_in):
+            pick = next((p for p in picks if p["player_id"] == p_out), None)
+            if pick:
+                supabase.table("squad_picks").update({"player_id": p_in}).eq("id", pick["id"]).execute()
+                
+        return {
+            "success": True, 
+            "message": f"Processed {num_transfers} transfers. Cost: -{transfer_cost} pts.",
+            "new_balance": new_bank_balance,
+            "transfer_cost": transfer_cost
+        }
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 @app.put("/api/v1/team/{team_id}/lineup")
-def save_lineup(team_id: int, req: LineupRequest):
+def save_lineup(team_id: int, req: LineupRequest, user = Depends(get_current_user)):
+    verify_team_ownership(team_id, user)
+    
     if not supabase:
         raise HTTPException(status_code=500, detail="Database not configured")
     try:
@@ -727,3 +1218,18 @@ def save_lineup(team_id: int, req: LineupRequest):
         return {"success": True, "message": "Lineup saved successfully"}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+# --- Engine Endpoints ---
+
+@app.post("/api/v1/engine/process-gameweek/{gameweek_id}")
+def trigger_process_gameweek(gameweek_id: int):
+    """
+    Triggers the end-of-gameweek engine:
+    1. Runs auto-subs
+    2. Calculates final points
+    3. Resolves H2H matchups
+    """
+    result = engine.process_gameweek(gameweek_id)
+    if result["status"] == "error":
+        raise HTTPException(status_code=500, detail=result["message"])
+    return result
