@@ -97,10 +97,21 @@ export default function ProfilePage() {
     setAchievements(unlocked);
   }, [loginStreak]);
 
+  const shareStats = () => {
+    const text = `🏆 AI Football Dashboard Stats 🏆\n💰 Bankroll: £${aiCoins.toFixed(2)}\n🎟️ Total Bets: ${stats.totalBets}\n📈 Net Profit: £${stats.netProfit.toFixed(2)}\n🔥 Login Streak: ${loginStreak} days\n🏅 Achievements: ${achievements.length}`;
+    navigator.clipboard.writeText(text).then(() => {
+      alert("📋 Stats copied to clipboard! Share them with your mates!");
+    });
+  };
+
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">
-      <h1 className="text-3xl font-black mb-6">👔 {t.managerProfile || "Manager Profile"}</h1>
-
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-black">👔 {t.managerProfile || "Manager Profile"}</h1>
+        <button onClick={shareStats} className="btn-primary px-4 py-2 text-sm flex items-center gap-2">
+          📤 Share Stats
+        </button>
+      </div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         
         {/* Main Profile Card */}

@@ -7,6 +7,7 @@ import { useAppContext } from "@/app/context/AppContext";
 import LiveTicker from "@/app/dashboard/components/LiveTicker";
 import CommandPalette from "@/app/components/CommandPalette";
 import AIChatbot from "@/app/dashboard/components/AIChatbot";
+import NotificationBell from "@/app/dashboard/components/NotificationBell";
 import { translations } from "@/lib/translations";
 
 const API_URL = "http://localhost:8000";
@@ -159,6 +160,7 @@ export default function DashboardLayout({ children }) {
 
             {/* Toggles */}
             <div className="flex items-center gap-2 mr-2">
+              <NotificationBell />
               <button 
                 onClick={toggleTheme} 
                 className="p-2 rounded-full bg-[var(--bg-secondary)] border border-[var(--border-color)] hover:border-[var(--accent-primary)] transition-colors"
