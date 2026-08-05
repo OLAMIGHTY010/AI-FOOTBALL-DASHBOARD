@@ -15,12 +15,58 @@ CACHE_FILE = "cache_uefa_players.json"
 
 UEFA_CLUBS = {
     "ucl": [("Real Madrid", 541), ("Man City", 50), ("Bayern Munich", 157), ("PSG", 85), ("Arsenal", 42), ("Inter Milan", 505), ("Barcelona", 529), ("Liverpool", 40)],
-    "uel": [("Roma", 52), ("Man United", 33), ("Tottenham", 47), ("Porto", 212), ("Athletic Club", 531), ("Ajax", 194), ("Lazio", 487), ("Fenerbahce", 611)],
-    "uecl": [("Chelsea", 49), ("Fiorentina", 502), ("Real Betis", 543), ("Heidenheim", 73), ("Panathinaikos", 622), ("Copenhagen", 620), ("Legia Warsaw", 618), ("Gent", 617)]
+    "uel": [("Man United", 33), ("Rangers", 257), ("Benfica", 211), ("Anderlecht", 554), ("Porto", 212), ("Ajax", 194), ("Besiktas", 549), ("Fenerbahce", 611)],
+    "uecl": [("Chelsea", 49), ("Fiorentina", 502), ("Real Betis", 543), ("Heidenheim", 73), ("Heart Of Midlothian", 254), ("Larne", 5354), ("Shamrock Rovers", 652), ("Molde", 329)]
 }
 
 # Pre-generate mock players to keep them consistent across requests
 MOCK_UEFA_PLAYERS = {"ucl": [], "uel": [], "uecl": []}
+TEAMS_CACHE_FILE = "cache_uefa_teams.json"
+
+def fetch_uefa_teams_from_api(season=2024):
+    if os.path.exists(TEAMS_CACHE_FILE):
+        if time.time() - os.path.getmtime(TEAMS_CACHE_FILE) < 86400 * 7: # Cache for 7 days
+            try:
+                with open(TEAMS_CACHE_FILE, "r") as f:
+                    cached = json.load(f)
+                    UEFA_CLUBS.update(cached)
+                    return
+            except Exception as e:
+                print(f"Error loading teams cache: {e}")
+
+    if not API_FOOTBALL_KEY or API_FOOTBALL_KEY == "your_api_key_here":
+        return
+
+    print("Fetching confirmed UEFA teams from API-Football...")
+    headers = {"x-apisports-key": API_FOOTBALL_KEY}
+    
+    # Mapping league to ID
+    leagues = {"uel": 3, "uecl": 848, "ucl": 2}
+    updated_clubs = {}
+    
+    for comp, league_id in leagues.items():
+        try:
+            res = requests.get(f"https://v3.football.api-sports.io/standings?league={league_id}&season={season}", headers=headers, timeout=5)
+            data = res.json()
+            if data.get("response"):
+                standings = data["response"][0]["league"]["standings"][0]
+                teams = []
+                # Only take up to 8 top teams for our simulation
+                for t in standings[:8]:
+                    teams.append((t["team"]["name"], t["team"]["id"]))
+                
+                if teams:
+                    updated_clubs[comp] = teams
+                    UEFA_CLUBS[comp] = teams
+        except Exception as e:
+            print(f"Failed to fetch {comp} teams: {e}")
+            
+    if updated_clubs:
+        with open(TEAMS_CACHE_FILE, "w") as f:
+            json.load(f) if False else json.dump(updated_clubs, f)
+
+# Try fetching dynamic teams before generating players
+fetch_uefa_teams_from_api()
 
 def _generate_mock_players():
     pos_map = {1: "GK", 2: "DEF", 3: "MID", 4: "FWD"}

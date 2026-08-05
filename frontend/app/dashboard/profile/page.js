@@ -1,108 +1,204 @@
 "use client";
-import { useState, useEffect } from "react";
-import { supabase } from "@/lib/supabaseClient";
-import Link from "next/link";
+
+import { useState, useEffect } from 'react';
+import { useAppContext } from "@/app/context/AppContext";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer
+} from "recharts";
+import { translations } from "@/lib/translations";
 
 export default function ProfilePage() {
-  const [session, setSession] = useState(null);
-  const [club, setClub] = useState([]);
-  const [bankroll, setBankroll] = useState(0);
-  const [fplSquad, setFplSquad] = useState(null);
+  const { aiCoins, loginStreak, language } = useAppContext();
+  const t = translations[language] || translations['en'];
+  
+  const [stats, setStats] = useState({
+    totalBets: 0,
+    totalWagered: 0,
+    totalReturned: 0,
+    netProfit: 0,
+    roi: 0,
+    biggestWin: 0,
+  });
+
+  const [achievements, setAchievements] = useState([]);
+  const [bankrollHistory, setBankrollHistory] = useState([]);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
+    // Calculate betting stats from local storage
+    const settledBets = JSON.parse(localStorage.getItem("settled_bets") || "[]");
+    
+    let totalWagered = 0;
+    let totalReturned = 0;
+    let biggestWin = 0;
+
+    settledBets.forEach(bet => {
+      const wager = parseFloat(bet.wager);
+      totalWagered += wager;
+      
+      let returned = 0;
+      if (bet.status === "WON") {
+        returned = parseFloat(bet.potentialWin);
+      } else if (bet.status === "CASH OUT") {
+        returned = parseFloat(bet.potential_payout || bet.wager);
+      }
+      
+      totalReturned += returned;
+      
+      if (bet.status === "WON" && (returned - wager) > biggestWin) {
+        biggestWin = returned - wager;
+      }
+    });
+    
+    // Generate Bankroll History data
+    let currentBank = 1000; // Starting amount
+    const history = [{ name: 'Start', bankroll: 1000 }];
+    
+    settledBets.forEach((bet, i) => {
+      currentBank -= parseFloat(bet.wager);
+      if (bet.status === "WON") {
+        currentBank += parseFloat(bet.potentialWin);
+      } else if (bet.status === "CASH OUT") {
+        currentBank += parseFloat(bet.potential_payout || bet.wager);
+      }
+      history.push({ name: `Bet ${i+1}`, bankroll: currentBank });
+    });
+    setBankrollHistory(history);
+
+    const netProfit = totalReturned - totalWagered;
+    const roi = totalWagered > 0 ? ((netProfit / totalWagered) * 100).toFixed(1) : 0;
+
+    setStats({
+      totalBets: settledBets.length,
+      totalWagered,
+      totalReturned,
+      netProfit,
+      roi,
+      biggestWin
     });
 
-    setClub(JSON.parse(localStorage.getItem('my_club') || '[]'));
-    setBankroll(parseFloat(localStorage.getItem('bankroll') || '0'));
-    setFplSquad(JSON.parse(localStorage.getItem('fpl_squad') || 'null'));
-  }, []);
+    // Determine Achievements
+    const unlocked = [];
+    if (settledBets.length >= 1) unlocked.push({ icon: '🎟️', name: 'First Bet Placed', desc: 'You placed your very first bet.' });
+    if (settledBets.length >= 10) unlocked.push({ icon: '🔥', name: 'High Roller', desc: 'Placed 10+ bets in the Virtual Sportsbook.' });
+    if (netProfit > 500) unlocked.push({ icon: '💰', name: 'Tycoon', desc: 'Earned over £500 in net profit.' });
+    if (biggestWin >= 200) unlocked.push({ icon: '🎰', name: 'Jackpot', desc: 'Won over £200 from a single bet.' });
+    if (loginStreak >= 3) unlocked.push({ icon: '📅', name: 'Loyal Manager', desc: 'Logged in for 3 consecutive days.' });
+    
+    if (unlocked.length === 0) {
+      unlocked.push({ icon: '🌱', name: 'Rookie', desc: 'Just getting started in the Virtual Hub.' });
+    }
 
-  if (!session) {
-    return (
-      <div className="flex flex-col items-center justify-center h-[70vh]">
-        <div className="text-6xl mb-4">👤</div>
-        <h2 className="text-2xl font-bold mb-2">Not Logged In</h2>
-        <p className="text-[var(--text-secondary)] mb-6">You need to sign in to view your Manager Profile.</p>
-        <Link href="/" className="btn-primary px-8">Go to Login</Link>
-      </div>
-    );
-  }
-
-  // Trophies logic (mocked based on club size and bankroll for now)
-  const trophies = [];
-  if (bankroll > 1000) trophies.push({ icon: "🏆", name: "High Roller", desc: "Accumulate $1,000 Bankroll" });
-  if (bankroll > 5000) trophies.push({ icon: "👑", name: "Billionaire Boys Club", desc: "Accumulate $5,000 Bankroll" });
-  if (club.length > 10) trophies.push({ icon: "🏟️", name: "Squad Builder", desc: "Collect 10+ UT Players" });
-  if (club.some(p => p.rating >= 90)) trophies.push({ icon: "⭐", name: "Galactico", desc: "Own a 90+ rated player" });
-  if (fplSquad) trophies.push({ icon: "👔", name: "Tactician", desc: "Build an FPL Squad" });
+    setAchievements(unlocked);
+  }, [loginStreak]);
 
   return (
-    <div className="animate-fade-in max-w-5xl mx-auto pb-12">
-      <div className="flex flex-col md:flex-row items-center gap-6 mb-10 p-8 glass-card bg-gradient-to-br from-gray-900 to-black border-l-4 border-[var(--accent-primary)]">
-        <div className="w-24 h-24 rounded-full bg-gradient-to-r from-purple-500 to-blue-500 flex items-center justify-center text-4xl font-black shadow-[0_0_20px_rgba(168,85,247,0.4)]">
-          {session.user.email.substring(0,2).toUpperCase()}
+    <div className="p-6 max-w-6xl mx-auto space-y-6">
+      <h1 className="text-3xl font-black mb-6">👔 {t.managerProfile || "Manager Profile"}</h1>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        
+        {/* Main Profile Card */}
+        <div className="glass-card p-6 flex flex-col items-center justify-center border-[var(--accent-primary)] border-t-4">
+          <div className="w-32 h-32 rounded-full bg-[var(--bg-secondary)] flex items-center justify-center text-5xl mb-4 border-4 border-[var(--accent-primary)]">
+            🧑‍💼
+          </div>
+          <h2 className="text-xl font-bold mb-1">AI Manager</h2>
+          <p className="text-[var(--text-secondary)] mb-4">{t.level || "Level"} 1</p>
+          
+          <div className="w-full bg-[var(--bg-secondary)] rounded p-3 text-center mb-2 flex justify-between items-center">
+            <span className="text-sm font-bold text-[var(--text-secondary)]">{t.bankroll || "Bankroll"}</span>
+            <span className="font-black text-xl text-yellow-400">£{aiCoins.toFixed(2)}</span>
+          </div>
+          
+          <div className="w-full bg-[var(--bg-secondary)] rounded p-3 text-center flex justify-between items-center">
+            <span className="text-sm font-bold text-[var(--text-secondary)]">{t.loginStreak || "Login Streak"}</span>
+            <span className="font-black text-xl text-orange-400">🔥 {loginStreak} Days</span>
+          </div>
         </div>
-        <div className="flex-1 text-center md:text-left">
-          <h1 className="text-3xl font-black text-white mb-1">{session.user.email}</h1>
-          <p className="text-[var(--text-secondary)] mb-4">Joined: {new Date(session.user.created_at).toLocaleDateString()}</p>
-          <div className="flex flex-wrap justify-center md:justify-start gap-4">
-            <div className="bg-black/50 px-4 py-2 rounded-lg border border-[var(--border-color)]">
-              <span className="text-xs text-[var(--text-secondary)] block uppercase font-bold">Net Worth</span>
-              <span className="text-xl font-black text-[var(--accent-primary)]">${bankroll.toFixed(2)}</span>
+
+        {/* Betting Stats */}
+        <div className="md:col-span-2 glass-card p-6">
+          <h2 className="text-xl font-bold mb-4 border-b border-[var(--border-color)] pb-2">📊 {t.lifetimeStats || "Lifetime Betting Stats"}</h2>
+          
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            <div className="bg-[var(--bg-secondary)] p-4 rounded-lg">
+              <div className="text-sm text-[var(--text-secondary)] mb-1">{t.totalBets || "Total Bets"}</div>
+              <div className="text-2xl font-black">{stats.totalBets}</div>
             </div>
-            <div className="bg-black/50 px-4 py-2 rounded-lg border border-[var(--border-color)]">
-              <span className="text-xs text-[var(--text-secondary)] block uppercase font-bold">Club Size</span>
-              <span className="text-xl font-black text-white">{club.length} Players</span>
+            <div className="bg-[var(--bg-secondary)] p-4 rounded-lg">
+              <div className="text-sm text-[var(--text-secondary)] mb-1">{t.totalWagered || "Total Wagered"}</div>
+              <div className="text-2xl font-black">£{stats.totalWagered.toFixed(2)}</div>
+            </div>
+            <div className="bg-[var(--bg-secondary)] p-4 rounded-lg">
+              <div className="text-sm text-[var(--text-secondary)] mb-1">{t.totalReturned || "Total Returned"}</div>
+              <div className="text-2xl font-black text-blue-400">£{stats.totalReturned.toFixed(2)}</div>
+            </div>
+            <div className={`p-4 rounded-lg border ${stats.netProfit >= 0 ? 'bg-green-500/10 border-green-500/30' : 'bg-red-500/10 border-red-500/30'}`}>
+              <div className="text-sm text-[var(--text-secondary)] mb-1">{t.netProfit || "Net Profit"}</div>
+              <div className={`text-2xl font-black ${stats.netProfit >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                {stats.netProfit >= 0 ? '+' : ''}£{stats.netProfit.toFixed(2)}
+              </div>
+            </div>
+            <div className={`p-4 rounded-lg border ${stats.roi >= 0 ? 'bg-green-500/10 border-green-500/30' : 'bg-red-500/10 border-red-500/30'}`}>
+              <div className="text-sm text-[var(--text-secondary)] mb-1">ROI</div>
+              <div className={`text-2xl font-black ${stats.roi >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                {stats.roi}%
+              </div>
+            </div>
+            <div className="bg-yellow-500/10 border border-yellow-500/30 p-4 rounded-lg">
+              <div className="text-sm text-yellow-500/70 mb-1">{t.biggestWin || "Biggest Win"}</div>
+              <div className="text-2xl font-black text-yellow-400">£{stats.biggestWin.toFixed(2)}</div>
             </div>
           </div>
         </div>
       </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Trophies */}
-        <div className="glass-card p-6">
-          <h2 className="text-xl font-bold mb-4 border-b border-[var(--border-color)] pb-2">Trophy Cabinet</h2>
-          {trophies.length === 0 ? (
-            <p className="text-[var(--text-secondary)] italic">Play the game to earn trophies!</p>
+      
+      {/* Bankroll Chart */}
+      <div className="glass-card p-6">
+        <h2 className="text-xl font-bold mb-4 border-b border-[var(--border-color)] pb-2">📈 Bankroll History</h2>
+        <div className="h-[300px] w-full">
+          {bankrollHistory.length > 1 ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={bankrollHistory} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+                <XAxis dataKey="name" stroke="#888" />
+                <YAxis stroke="#888" domain={['auto', 'auto']} />
+                <Tooltip 
+                  contentStyle={{ backgroundColor: '#000', border: '1px solid #333' }}
+                  itemStyle={{ color: '#00ff87', fontWeight: 'bold' }}
+                />
+                <Line type="monotone" dataKey="bankroll" stroke="#00ff87" strokeWidth={3} dot={false} activeDot={{ r: 8 }} />
+              </LineChart>
+            </ResponsiveContainer>
           ) : (
-            <div className="grid grid-cols-2 gap-4">
-              {trophies.map((t, i) => (
-                <div key={i} className="flex items-center gap-3 bg-black/40 p-3 rounded-lg border border-white/5">
-                  <div className="text-3xl drop-shadow-md">{t.icon}</div>
-                  <div>
-                    <div className="font-bold text-sm text-white">{t.name}</div>
-                    <div className="text-[10px] text-[var(--text-secondary)]">{t.desc}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Top Players */}
-        <div className="glass-card p-6">
-          <h2 className="text-xl font-bold mb-4 border-b border-[var(--border-color)] pb-2">Top Club Players</h2>
-          {club.length === 0 ? (
-            <p className="text-[var(--text-secondary)] italic">Open packs to get players!</p>
-          ) : (
-            <div className="space-y-3">
-              {club.sort((a,b) => b.rating - a.rating).slice(0, 4).map((p, i) => (
-                <div key={i} className="flex justify-between items-center bg-black/40 p-3 rounded-lg border border-white/5">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs ${p.rating >= 85 ? 'bg-yellow-500 text-black' : p.rating >= 75 ? 'bg-gray-300 text-black' : 'bg-[#cd7f32] text-white'}`}>
-                      {p.rating}
-                    </div>
-                    <span className="font-bold text-sm">{p.name}</span>
-                  </div>
-                  <span className="text-xs text-[var(--text-secondary)]">{p.position} | {p.team}</span>
-                </div>
-              ))}
+            <div className="flex items-center justify-center h-full text-[var(--text-secondary)]">
+              Not enough betting history to display chart. Place some bets!
             </div>
           )}
         </div>
       </div>
+
+      {/* Achievements Box */}
+      <div className="glass-card p-6">
+        <h2 className="text-xl font-bold mb-4 border-b border-[var(--border-color)] pb-2">🏆 {t.achievements || "Achievements"}</h2>
+        
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+          {achievements.map((ach, idx) => (
+            <div key={idx} className="bg-[var(--bg-secondary)] border border-[var(--accent-primary)]/50 rounded-lg p-4 flex flex-col items-center text-center transition-all hover:scale-105 hover:bg-[var(--accent-primary)]/10">
+              <div className="text-4xl mb-2">{ach.icon}</div>
+              <div className="font-bold mb-1">{ach.name}</div>
+              <div className="text-xs text-[var(--text-secondary)]">{ach.desc}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
     </div>
   );
 }

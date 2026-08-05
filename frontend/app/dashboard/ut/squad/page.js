@@ -2,24 +2,66 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 
-const FORMATION = [
-  { id: 0, pos: "FWD", top: "15%", left: "35%" },
-  { id: 1, pos: "FWD", top: "15%", left: "65%" },
-  { id: 2, pos: "MID", top: "40%", left: "15%" },
-  { id: 3, pos: "MID", top: "40%", left: "38%" },
-  { id: 4, pos: "MID", top: "40%", left: "62%" },
-  { id: 5, pos: "MID", top: "40%", left: "85%" },
-  { id: 6, pos: "DEF", top: "70%", left: "15%" },
-  { id: 7, pos: "DEF", top: "70%", left: "38%" },
-  { id: 8, pos: "DEF", top: "70%", left: "62%" },
-  { id: 9, pos: "DEF", top: "70%", left: "85%" },
-  { id: 10, pos: "GK", top: "90%", left: "50%" }
-];
+const FORMATIONS = {
+  "4-4-2": [
+    { id: 0, pos: "FWD", top: "15%", left: "35%" },
+    { id: 1, pos: "FWD", top: "15%", left: "65%" },
+    { id: 2, pos: "MID", top: "40%", left: "15%" },
+    { id: 3, pos: "MID", top: "40%", left: "38%" },
+    { id: 4, pos: "MID", top: "40%", left: "62%" },
+    { id: 5, pos: "MID", top: "40%", left: "85%" },
+    { id: 6, pos: "DEF", top: "70%", left: "15%" },
+    { id: 7, pos: "DEF", top: "70%", left: "38%" },
+    { id: 8, pos: "DEF", top: "70%", left: "62%" },
+    { id: 9, pos: "DEF", top: "70%", left: "85%" },
+    { id: 10, pos: "GK", top: "90%", left: "50%" }
+  ],
+  "4-3-3": [
+    { id: 0, pos: "FWD", top: "15%", left: "20%" },
+    { id: 1, pos: "FWD", top: "10%", left: "50%" },
+    { id: 2, pos: "FWD", top: "15%", left: "80%" },
+    { id: 3, pos: "MID", top: "40%", left: "25%" },
+    { id: 4, pos: "MID", top: "45%", left: "50%" },
+    { id: 5, pos: "MID", top: "40%", left: "75%" },
+    { id: 6, pos: "DEF", top: "70%", left: "15%" },
+    { id: 7, pos: "DEF", top: "70%", left: "38%" },
+    { id: 8, pos: "DEF", top: "70%", left: "62%" },
+    { id: 9, pos: "DEF", top: "70%", left: "85%" },
+    { id: 10, pos: "GK", top: "90%", left: "50%" }
+  ],
+  "3-5-2": [
+    { id: 0, pos: "FWD", top: "15%", left: "35%" },
+    { id: 1, pos: "FWD", top: "15%", left: "65%" },
+    { id: 2, pos: "MID", top: "35%", left: "10%" },
+    { id: 3, pos: "MID", top: "45%", left: "30%" },
+    { id: 4, pos: "MID", top: "40%", left: "50%" },
+    { id: 5, pos: "MID", top: "45%", left: "70%" },
+    { id: 6, pos: "MID", top: "35%", left: "90%" },
+    { id: 7, pos: "DEF", top: "70%", left: "25%" },
+    { id: 8, pos: "DEF", top: "70%", left: "50%" },
+    { id: 9, pos: "DEF", top: "70%", left: "75%" },
+    { id: 10, pos: "GK", top: "90%", left: "50%" }
+  ],
+  "5-3-2": [
+    { id: 0, pos: "FWD", top: "15%", left: "35%" },
+    { id: 1, pos: "FWD", top: "15%", left: "65%" },
+    { id: 2, pos: "MID", top: "40%", left: "25%" },
+    { id: 3, pos: "MID", top: "45%", left: "50%" },
+    { id: 4, pos: "MID", top: "40%", left: "75%" },
+    { id: 5, pos: "DEF", top: "70%", left: "10%" },
+    { id: 6, pos: "DEF", top: "75%", left: "30%" },
+    { id: 7, pos: "DEF", top: "75%", left: "50%" },
+    { id: 8, pos: "DEF", top: "75%", left: "70%" },
+    { id: 9, pos: "DEF", top: "70%", left: "90%" },
+    { id: 10, pos: "GK", top: "90%", left: "50%" }
+  ]
+};
 
 export default function SquadBuilderPage() {
   const [club, setClub] = useState([]);
   const [squad, setSquad] = useState(Array(11).fill(null));
   const [activeSlot, setActiveSlot] = useState(null);
+  const [formationId, setFormationId] = useState("4-4-2");
 
   useEffect(() => {
     setClub(JSON.parse(localStorage.getItem("my_club") || "[]"));
@@ -27,11 +69,17 @@ export default function SquadBuilderPage() {
     if (savedSquad && savedSquad.length === 11) {
       setSquad(savedSquad);
     }
+    const savedFormation = localStorage.getItem("my_formation");
+    if (savedFormation && FORMATIONS[savedFormation]) {
+      setFormationId(savedFormation);
+    }
   }, []);
 
-  const saveSquad = (newSquad) => {
+  const saveSquad = (newSquad, newFormation = formationId) => {
     setSquad(newSquad);
+    setFormationId(newFormation);
     localStorage.setItem("my_squad", JSON.stringify(newSquad));
+    localStorage.setItem("my_formation", newFormation);
   };
 
   const handleSlotClick = (index) => {
@@ -60,25 +108,90 @@ export default function SquadBuilderPage() {
     saveSquad(newSquad);
   };
 
+  const autoBuildSquad = () => {
+    // Determine best formation and squad
+    let bestFormation = "4-4-2";
+    let bestSquad = Array(11).fill(null);
+    let maxRating = 0;
+
+    const clubSorted = [...club].sort((a, b) => b.rating - a.rating);
+
+    for (const fId of Object.keys(FORMATIONS)) {
+      const formSlots = FORMATIONS[fId];
+      let currentSquad = Array(11).fill(null);
+      let usedIds = new Set();
+      let currentTotal = 0;
+      let valid = true;
+
+      for (let i = 0; i < formSlots.length; i++) {
+        const pos = formSlots[i].pos;
+        const player = clubSorted.find(p => p.position === pos && !usedIds.has(p.id));
+        if (player) {
+          currentSquad[i] = player;
+          usedIds.add(player.id);
+          currentTotal += player.rating;
+        } else {
+          valid = false;
+          break;
+        }
+      }
+
+      if (valid && currentTotal > maxRating) {
+        maxRating = currentTotal;
+        bestFormation = fId;
+        bestSquad = currentSquad;
+      }
+    }
+
+    if (maxRating > 0) {
+      saveSquad(bestSquad, bestFormation);
+    } else {
+      alert("Not enough players in your club to form a full 11-man squad in any standard formation! Open more packs.");
+    }
+  };
+
   const validPlayers = squad.filter(p => p !== null);
   const totalRating = validPlayers.reduce((acc, p) => acc + p.rating, 0);
   const teamRating = validPlayers.length > 0 ? Math.round(totalRating / validPlayers.length) : 0;
   const isComplete = validPlayers.length === 11;
 
+  const currentFormationLayout = FORMATIONS[formationId];
+
   const availablePlayers = activeSlot !== null 
-    ? club.filter(p => p.position === FORMATION[activeSlot].pos)
+    ? club.filter(p => p.position === currentFormationLayout[activeSlot].pos)
     : [];
 
   return (
     <div className="animate-fade-in max-w-7xl mx-auto flex flex-col lg:flex-row gap-6">
       <div className="flex-1">
-        <div className="flex justify-between items-end mb-6">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-6 border-b border-[var(--border-color)] pb-4 gap-4">
           <div>
             <h1 className="text-3xl font-bold mb-2">📋 Squad Builder</h1>
-            <p className="text-[var(--text-secondary)]">Construct your Starting 11 (4-4-2).</p>
+            <p className="text-[var(--text-secondary)]">Construct your Starting 11.</p>
           </div>
-          <div className="flex gap-4">
-            <Link href="/dashboard/ut/club" className="btn-secondary">My Club</Link>
+          <div className="flex flex-wrap gap-4 items-center">
+            <select 
+              value={formationId} 
+              onChange={(e) => {
+                if(confirm("Changing formation will reset your current squad. Continue?")) {
+                  saveSquad(Array(11).fill(null), e.target.value);
+                  setActiveSlot(null);
+                }
+              }}
+              className="bg-[var(--bg-secondary)] border border-[var(--border-color)] p-2 rounded text-white font-bold"
+            >
+              {Object.keys(FORMATIONS).map(f => (
+                <option key={f} value={f}>{f}</option>
+              ))}
+            </select>
+
+            <button 
+              onClick={autoBuildSquad}
+              className="btn-primary flex items-center gap-2 bg-gradient-to-r from-purple-500 to-indigo-600 border-none shadow-[0_0_15px_rgba(168,85,247,0.5)]"
+            >
+              🤖 Auto-Build (AI)
+            </button>
+            <Link href="/dashboard/ut/club" className="btn-secondary hidden md:block">My Club</Link>
             <Link href="/dashboard/ut/play" className={`btn-primary ${!isComplete ? 'opacity-50 pointer-events-none' : ''}`}>
               Play Match 🏟️
             </Link>
@@ -96,7 +209,7 @@ export default function SquadBuilderPage() {
           <div className="absolute bottom-4 left-1/2 -translate-x-1/2 w-1/2 h-1/6 border-2 border-b-0 border-white/30 pointer-events-none"></div>
 
           {/* Slots */}
-          {FORMATION.map((slot, i) => {
+          {currentFormationLayout.map((slot, i) => {
             const player = squad[i];
             const isActive = activeSlot === i;
             
@@ -161,13 +274,13 @@ export default function SquadBuilderPage() {
         {activeSlot !== null && (
           <div className="glass-card animate-fade-in max-h-[500px] flex flex-col">
             <h3 className="font-bold border-b border-[var(--border-color)] pb-3 mb-3">
-              Select {FORMATION[activeSlot].pos}
+              Select {currentFormationLayout[activeSlot].pos}
             </h3>
             
             <div className="overflow-y-auto space-y-2 pr-2">
               {availablePlayers.length === 0 ? (
                 <p className="text-sm text-[var(--text-secondary)] text-center py-4">
-                  No {FORMATION[activeSlot].pos} players in your club. <br/><br/>
+                  No {currentFormationLayout[activeSlot].pos} players in your club. <br/><br/>
                   <Link href="/dashboard/ut" className="text-[var(--accent-primary)] underline">Open Packs</Link>
                 </p>
               ) : (

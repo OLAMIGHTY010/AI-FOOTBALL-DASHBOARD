@@ -3,16 +3,21 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
+import { useAppContext } from "@/app/context/AppContext";
+import LiveTicker from "@/app/dashboard/components/LiveTicker";
+import CommandPalette from "@/app/components/CommandPalette";
+import AIChatbot from "@/app/dashboard/components/AIChatbot";
+import { translations } from "@/lib/translations";
 
 const API_URL = "http://localhost:8000";
 
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", id: "dashboard" },
-  { href: "/dashboard/simulate", label: "Virtual Hub", id: "virtual" },
-  { href: "/dashboard/ut", label: "Ultimate Team", id: "ut" },
-  { href: "/dashboard/fpl", label: "FPL Hub", id: "fpl" },
-  { href: "/dashboard/leaderboards", label: "Global Ranks", id: "leaderboards" },
-  { href: "/dashboard/chat", label: "Global Chat", id: "chat" },
+  { href: "/dashboard/simulate", label: "Virtual Hub", id: "virtualHub" },
+  { href: "/dashboard/ut", label: "Ultimate Team", id: "ultimateTeam" },
+  { href: "/dashboard/fpl", label: "FPL Hub", id: "fplHub" },
+  { href: "/dashboard/leaderboards", label: "Global Ranks", id: "globalRanks" },
+  { href: "/dashboard/chat", label: "Global Chat", id: "globalChat" },
   { href: "/dashboard/profile", label: "Profile", id: "profile" },
 ];
 
@@ -22,12 +27,16 @@ export default function DashboardLayout({ children }) {
   const [debt, setDebt] = useState(0);
   const [loading, setLoading] = useState(true);
   const pathname = usePathname();
+  const { theme, toggleTheme, soundEnabled, toggleSound, language, changeLanguage } = useAppContext();
+  const t = translations[language] || translations['en'];
 
   const isFPLApp = pathname.startsWith("/dashboard/fpl") || 
                    pathname.startsWith("/dashboard/leagues") || 
                    pathname.startsWith("/dashboard/fixtures") || 
                    pathname.startsWith("/dashboard/community") || 
                    pathname.startsWith("/dashboard/more");
+
+  const isVirtualApp = pathname.startsWith("/dashboard/simulate");
 
   useEffect(() => {
     const checkUser = async () => {
@@ -111,7 +120,7 @@ export default function DashboardLayout({ children }) {
             <div className="hidden md:flex items-center gap-1">
               {NAV_ITEMS.map((item) => (
                 <Link key={item.id} href={item.href} className="nav-link">
-                  {item.label}
+                  {t[item.id] || item.label}
                 </Link>
               ))}
             </div>
@@ -137,13 +146,42 @@ export default function DashboardLayout({ children }) {
               + $1K
             </button>
 
+            {/* Language Selector */}
+            <select 
+              value={language} 
+              onChange={(e) => changeLanguage(e.target.value)}
+              className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-md px-2 py-1 text-xs text-[var(--text-primary)]"
+            >
+              <option value="en">EN</option>
+              <option value="es">ES</option>
+              <option value="fr">FR</option>
+            </select>
+
+            {/* Toggles */}
+            <div className="flex items-center gap-2 mr-2">
+              <button 
+                onClick={toggleTheme} 
+                className="p-2 rounded-full bg-[var(--bg-secondary)] border border-[var(--border-color)] hover:border-[var(--accent-primary)] transition-colors"
+                title="Toggle Theme"
+              >
+                {theme === 'dark' ? '🌙' : '☀️'}
+              </button>
+              <button 
+                onClick={toggleSound} 
+                className="p-2 rounded-full bg-[var(--bg-secondary)] border border-[var(--border-color)] hover:border-[var(--accent-primary)] transition-colors"
+                title="Toggle Sound"
+              >
+                {soundEnabled ? '🔊' : '🔇'}
+              </button>
+            </div>
+
             {/* User */}
             <div className="flex items-center gap-2">
               <span className="text-sm text-[var(--text-secondary)] hidden md:block">
                 {user.email}
               </span>
               <button onClick={handleLogout} className="text-xs text-red-400 hover:text-red-300">
-                Logout
+                {t.logout || "Logout"}
               </button>
             </div>
           </div>
@@ -154,7 +192,7 @@ export default function DashboardLayout({ children }) {
       <div className="md:hidden flex gap-1 p-2 overflow-x-auto border-b border-[var(--border-color)]">
         {NAV_ITEMS.map((item) => (
           <Link key={item.id} href={item.href} className="nav-link whitespace-nowrap text-xs">
-            {item.label}
+            {t[item.id] || item.label}
           </Link>
         ))}
       </div>
@@ -175,6 +213,12 @@ export default function DashboardLayout({ children }) {
             <Link href="/dashboard/community" className={`px-6 py-3 font-bold text-sm whitespace-nowrap transition-colors ${pathname.includes('/community') ? 'text-white border-b-2 border-[#00ff87]' : 'text-gray-400 hover:text-white'}`}>
               💬 Community
             </Link>
+            <Link href="/dashboard/fpl/set-pieces" className={`px-6 py-3 font-bold text-sm whitespace-nowrap transition-colors ${pathname.includes('/fpl/set-pieces') ? 'text-white border-b-2 border-[#00ff87]' : 'text-gray-400 hover:text-white'}`}>
+              🎯 Set Pieces
+            </Link>
+            <Link href="/dashboard/fpl/stats" className={`px-6 py-3 font-bold text-sm whitespace-nowrap transition-colors ${pathname.includes('/fpl/stats') ? 'text-white border-b-2 border-[#00ff87]' : 'text-gray-400 hover:text-white'}`}>
+              📊 xG Stats
+            </Link>
             <Link href="/dashboard/more" className={`px-6 py-3 font-bold text-sm whitespace-nowrap transition-colors ${pathname.includes('/more') ? 'text-white border-b-2 border-[#00ff87]' : 'text-gray-400 hover:text-white'}`}>
               ••• More
             </Link>
@@ -182,10 +226,36 @@ export default function DashboardLayout({ children }) {
         </div>
       )}
 
+      {/* Virtual Sub-Navbar */}
+      {isVirtualApp && (
+        <div className="bg-[#162032] border-b border-gray-800 shadow-md">
+          <div className="max-w-7xl mx-auto flex items-center overflow-x-auto">
+            <Link href="/dashboard/simulate" className={`px-6 py-3 font-bold text-sm whitespace-nowrap transition-colors ${pathname === '/dashboard/simulate' ? 'text-white border-b-2 border-[#00ff87]' : 'text-gray-400 hover:text-white'}`}>
+              🎲 Betting Hub
+            </Link>
+            <Link href="/dashboard/simulate/tournament" className={`px-6 py-3 font-bold text-sm whitespace-nowrap transition-colors ${pathname.includes('/tournament') ? 'text-white border-b-2 border-[#00ff87]' : 'text-gray-400 hover:text-white'}`}>
+              🏆 Virtual Champions League
+            </Link>
+            <Link href="/dashboard/simulate/live" className={`px-6 py-3 font-bold text-sm whitespace-nowrap transition-colors ${pathname.includes('/live') ? 'text-white border-b-2 border-[#00ff87]' : 'text-gray-400 hover:text-white'}`}>
+              🔴 Live In-Play
+            </Link>
+          </div>
+        </div>
+      )}
+
       {/* Content */}
-      <main className="flex-1 max-w-7xl mx-auto w-full px-4 py-6">
+      <main className="flex-1 max-w-7xl mx-auto w-full px-4 py-6 mb-12">
         {children}
       </main>
+
+      {/* Live Ticker */}
+      <LiveTicker />
+
+      {/* AI Chatbot Assistant */}
+      <AIChatbot />
+
+      {/* Command Palette */}
+      <CommandPalette />
     </div>
   );
 }

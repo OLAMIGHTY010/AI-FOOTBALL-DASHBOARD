@@ -9,6 +9,7 @@ import random
 import string
 import scraper
 from database import supabase
+# from fpl_uefa import refresh_uefa_teams_cache
 from data import VIRTUAL_TEAMS
 from data_basketball import VIRTUAL_BASKETBALL_TEAMS
 from simulation import generate_fixtures, simulate_match, check_bet_result, calculate_all_odds
@@ -19,7 +20,7 @@ from ut import open_pack, PACKS, get_sell_value
 from tactics import get_tactics_data, FORMATIONS, TACTICAL_STYLES
 from fpl import get_fpl_data, optimize_fpl_squad
 from fpl_uefa import get_uefa_data, optimize_uefa_squad
-from data_racing import get_random_runners
+from data_racing import get_random_runners, CARS
 from simulation_racing import calculate_racing_odds, simulate_race
 from fpl_proxy import (
     get_fpl_bootstrap, get_fpl_fixtures, get_fpl_league,
@@ -42,6 +43,22 @@ for league, teams in VIRTUAL_TEAMS.items():
     standings[league] = {}
     for team in teams.keys():
         standings[league][team] = {"P": 0, "W": 0, "D": 0, "L": 0, "GF": 0, "GA": 0, "GD": 0, "Pts": 0}
+
+standings_basketball = {}
+for league, teams in VIRTUAL_BASKETBALL_TEAMS.items():
+    standings_basketball[league] = {}
+    for team in teams.keys():
+        standings_basketball[league][team] = {"P": 0, "W": 0, "L": 0, "PF": 0, "PA": 0, "PD": 0, "Pts": 0}
+
+standings_tennis = {}
+for league, players in VIRTUAL_TENNIS_PLAYERS.items():
+    standings_tennis[league] = {}
+    for player in players.keys():
+        standings_tennis[league][player] = {"P": 0, "W": 0, "L": 0, "SetsW": 0, "SetsL": 0, "Pts": 0}
+
+standings_racing = {"Global Leaderboard": {}}
+for car in CARS:
+    standings_racing["Global Leaderboard"][car["name"]] = {"P": 0, "W": 0, "Pts": 0}
 
 current_fixtures = []
 current_racing_fixtures = []
@@ -85,9 +102,12 @@ class EvolveRequest(BaseModel):
 class ParlayRequest(BaseModel):
     legs: List[dict]
     wager: float
+    user_id: Optional[str] = None
 
 class UTRecommendRequest(BaseModel):
-    club: List[dict]
+    club: List[dict] = []
+    squad: List[dict] = []
+    bankroll: float = 0.0
 
 class FPLAnalyzeRequest(BaseModel):
     standings: dict
@@ -149,7 +169,7 @@ def get_racing_fixtures():
         runners = calculate_racing_odds(runners)
         current_racing_fixtures = [{
             "id": f"race_{uuid.uuid4().hex[:8]}",
-            "name": "Virtual Derby - 1000m Sprint",
+            "name": "Virtual Grand Prix - 1000m Sprint",
             "runners": runners
         }]
     return {"fixtures": current_racing_fixtures}
@@ -158,17 +178,43 @@ def get_racing_fixtures():
 def simulate_racing_match(req: SimulateRequest):
     global current_racing_fixtures
     if not current_racing_fixtures:
-        return {"results": []}
+        runners = get_random_runners(8)
+        runners = calculate_racing_odds(runners)
+        current_racing_fixtures = [{
+            "id": f"race_{uuid.uuid4().hex[:8]}",
+            "name": "Virtual Grand Prix - 1000m Sprint",
+            "runners": runners
+        }]
+
+    results = simulate_race(current_racing_fixtures[0]["runners"])
     
-    race = current_racing_fixtures[0]
-    results = simulate_race(race.get("runners", []))
+    # Update Racing Standings (Global Leaderboard)
+    ls = standings_racing["Global Leaderboard"]
+    for i, runner in enumerate(results["standings"]):
+        name = runner["name"]
+        if name not in ls:
+            ls[name] = {"P": 0, "W": 0, "Pts": 0}
+        
+        ls[name]["P"] += 1
+        if i == 0:
+            ls[name]["W"] += 1
+            ls[name]["Pts"] += 10
+        elif i == 1:
+            ls[name]["Pts"] += 5
+        elif i == 2:
+            ls[name]["Pts"] += 2
     
+    # Inject fixture metadata so the frontend can display the race
+    results["id"] = current_racing_fixtures[0]["id"]
+    results["name"] = current_racing_fixtures[0]["name"]
+    results["runners"] = current_racing_fixtures[0]["runners"]
+
     # Generate next race
     runners = get_random_runners(8)
     runners = calculate_racing_odds(runners)
     current_racing_fixtures = [{
         "id": f"race_{uuid.uuid4().hex[:8]}",
-        "name": "Virtual Derby - 1000m Sprint",
+        "name": "Virtual Grand Prix - 1000m Sprint",
         "runners": runners
     }]
     
@@ -178,6 +224,35 @@ def simulate_racing_match(req: SimulateRequest):
 def simulate_basketball_matches():
     fixtures = generate_basketball_fixtures(VIRTUAL_BASKETBALL_TEAMS)
     results = [simulate_basketball_match(f) for f in fixtures]
+
+    for match_result in results:
+        home = match_result["home"]
+        away = match_result["away"]
+        league = match_result["league"]
+        h_name = home["name"]
+        a_name = away["name"]
+        
+        if league in standings_basketball and h_name in standings_basketball[league] and a_name in standings_basketball[league]:
+            ls = standings_basketball[league]
+            ls[h_name]["P"] += 1
+            ls[h_name]["PF"] += match_result["h_score"]
+            ls[h_name]["PA"] += match_result["a_score"]
+            ls[h_name]["PD"] = ls[h_name]["PF"] - ls[h_name]["PA"]
+            
+            ls[a_name]["P"] += 1
+            ls[a_name]["PF"] += match_result["a_score"]
+            ls[a_name]["PA"] += match_result["h_score"]
+            ls[a_name]["PD"] = ls[a_name]["PF"] - ls[a_name]["PA"]
+            
+            if match_result["h_score"] > match_result["a_score"]:
+                ls[h_name]["W"] += 1
+                ls[h_name]["Pts"] += 2
+                ls[a_name]["L"] += 1
+            else:
+                ls[a_name]["W"] += 1
+                ls[a_name]["Pts"] += 2
+                ls[h_name]["L"] += 1
+
     return {"results": results}
 
 @app.get("/api/fixtures/tennis")
@@ -189,25 +264,66 @@ def get_tennis_fixtures():
 def simulate_tennis_matches():
     fixtures = generate_tennis_fixtures(VIRTUAL_TENNIS_PLAYERS)
     results = [simulate_tennis_match(f) for f in fixtures]
+
+    for match_result in results:
+        home = match_result["home"]
+        away = match_result["away"]
+        league = home.get("league", "ATP") # Handle missing league if any
+        h_name = home["name"]
+        a_name = away["name"]
+
+        if league in standings_tennis and h_name in standings_tennis[league] and a_name in standings_tennis[league]:
+            ls = standings_tennis[league]
+            ls[h_name]["P"] += 1
+            ls[a_name]["P"] += 1
+
+            if match_result["match_winner"] == "home":
+                ls[h_name]["W"] += 1
+                ls[h_name]["Pts"] += 10
+                ls[h_name]["SetsW"] += 2
+                ls[h_name]["SetsL"] += match_result["a_sets_won"]
+                ls[a_name]["L"] += 1
+                ls[a_name]["SetsW"] += match_result["a_sets_won"]
+                ls[a_name]["SetsL"] += 2
+            else:
+                ls[a_name]["W"] += 1
+                ls[a_name]["Pts"] += 10
+                ls[a_name]["SetsW"] += 2
+                ls[a_name]["SetsL"] += match_result["h_sets_won"]
+                ls[h_name]["L"] += 1
+                ls[h_name]["SetsW"] += match_result["h_sets_won"]
+                ls[h_name]["SetsL"] += 2
+
     return {"results": results}
 
 
 @app.get("/api/standings/{league}")
-def get_standings(league: str):
-    if league in standings:
+def get_standings(league: str, sport: str = "football"):
+    s_dict = standings
+    if sport == "basketball": s_dict = standings_basketball
+    elif sport == "tennis": s_dict = standings_tennis
+    elif sport == "racing": s_dict = standings_racing
+
+    if league in s_dict:
+        # Generic sort by Pts
         sorted_standings = dict(
-            sorted(standings[league].items(), key=lambda x: (x[1]["Pts"], x[1]["GD"], x[1]["GF"]), reverse=True)
+            sorted(s_dict[league].items(), key=lambda x: x[1]["Pts"], reverse=True)
         )
         return sorted_standings
     return {}
 
 
 @app.get("/api/standings")
-def get_all_standings():
+def get_all_standings(sport: str = "football"):
+    s_dict = standings
+    if sport == "basketball": s_dict = standings_basketball
+    elif sport == "tennis": s_dict = standings_tennis
+    elif sport == "racing": s_dict = standings_racing
+
     result = {}
-    for league in standings:
+    for league in s_dict:
         result[league] = dict(
-            sorted(standings[league].items(), key=lambda x: (x[1]["Pts"], x[1]["GD"], x[1]["GF"]), reverse=True)
+            sorted(s_dict[league].items(), key=lambda x: x[1]["Pts"], reverse=True)
         )
     return result
 
@@ -270,27 +386,131 @@ def run_simulation(req: SimulateRequest):
                 ls[a_name]["Pts"] += 1
 
         results.append(match_result)
+        
+        # Evaluate pending bets for this match
+        for bet in pending_virtual_bets:
+            for leg in bet["legs"]:
+                if leg["fixtureId"] == match_result["id"]:
+                    # evaluate
+                    won = check_bet_result(leg["market"], match_result)
+                    leg["won"] = won
+
+    # Settlement pass for all pending bets
+    settled_this_round = []
+    for bet in pending_virtual_bets[:]:
+        all_resolved = True
+        any_lost = False
+        
+        for leg in bet["legs"]:
+            if "won" not in leg:
+                all_resolved = False
+            elif not leg["won"]:
+                any_lost = True
+        
+        if any_lost or all_resolved:
+            pending_virtual_bets.remove(bet)
+            if any_lost:
+                bet["status"] = "LOST"
+            else:
+                bet["status"] = "WON"
+                # Add to wallet balance
+                if bet.get("user_id") and supabase:
+                    try:
+                        wallet_res = supabase.table("wallets").select("balance").eq("user_id", bet["user_id"]).execute()
+                        if wallet_res.data:
+                            current_bal = float(wallet_res.data[0]["balance"])
+                            new_bal = current_bal + bet["potential_payout"]
+                            supabase.table("wallets").update({"balance": new_bal}).eq("user_id", bet["user_id"]).execute()
+                    except Exception as e:
+                        print("Error updating wallet for bet:", e)
+            settled_this_round.append(bet)
+            settled_virtual_bets.append(bet)
 
     # Generate Virtual Fixtures for other sports for next gameweek
     current_fixtures = generate_fixtures()
 
-    return {"results": results, "next_fixtures": current_fixtures}
+    return {"results": results, "next_fixtures": current_fixtures, "settled_bets": settled_this_round}
 
 
+
+pending_virtual_bets = []
+settled_virtual_bets = []
 
 @app.post("/api/bet/parlay")
 def place_parlay(req: ParlayRequest):
-    # Calculate combined odds
     combined_odds = 1.0
     for leg in req.legs:
         combined_odds *= leg.get("odds", 1.0)
     
-    # In reality, this would just be stored as pending
-    return {
-        "status": "pending",
+    bet_record = {
+        "id": str(uuid.uuid4()),
+        "user_id": req.user_id,
+        "wager": req.wager,
         "combined_odds": round(combined_odds, 2),
         "potential_payout": round(req.wager * combined_odds, 2),
-        "legs": req.legs
+        "legs": req.legs,
+        "status": "PENDING",
+        "timestamp": datetime.now().isoformat()
+    }
+    
+    # Deduct wager from wallet
+    if req.user_id and supabase:
+        try:
+            wallet_res = supabase.table("wallets").select("balance").eq("user_id", req.user_id).execute()
+            if wallet_res.data:
+                current_bal = float(wallet_res.data[0]["balance"])
+                new_bal = current_bal - req.wager
+                supabase.table("wallets").update({"balance": new_bal}).eq("user_id", req.user_id).execute()
+        except Exception as e:
+            print("Error deducting wager:", e)
+
+    pending_virtual_bets.append(bet_record)
+    
+    return bet_record
+
+class CashOutRequest(BaseModel):
+    bet_id: str
+    cash_out_amount: float
+    user_id: Optional[str] = None
+
+@app.post("/api/bet/cashout")
+def cashout_bet(req: CashOutRequest):
+    global pending_virtual_bets, settled_virtual_bets
+    bet_to_cashout = None
+    for b in pending_virtual_bets:
+        if b["id"] == req.bet_id:
+            bet_to_cashout = b
+            break
+            
+    if not bet_to_cashout:
+        return {"error": "Bet not found or already settled"}
+        
+    pending_virtual_bets.remove(bet_to_cashout)
+    bet_to_cashout["status"] = "CASH OUT"
+    bet_to_cashout["potential_payout"] = req.cash_out_amount
+    settled_virtual_bets.append(bet_to_cashout)
+    
+    # Add cash out amount to wallet
+    if req.user_id and supabase:
+        try:
+            wallet_res = supabase.table("wallets").select("balance").eq("user_id", req.user_id).execute()
+            if wallet_res.data:
+                current_bal = float(wallet_res.data[0]["balance"])
+                new_bal = current_bal + req.cash_out_amount
+                supabase.table("wallets").update({"balance": new_bal}).eq("user_id", req.user_id).execute()
+        except Exception as e:
+            print("Error adding cash out to wallet:", e)
+            
+    return bet_to_cashout
+
+@app.get("/api/bet/history")
+def get_bet_history(user_id: str = None):
+    # Retrieve pending and settled bets
+    user_pending = [b for b in pending_virtual_bets if not user_id or b.get("user_id") == user_id]
+    user_settled = [b for b in settled_virtual_bets if not user_id or b.get("user_id") == user_id]
+    return {
+        "pending": user_pending,
+        "settled": user_settled
     }
 
 
@@ -324,21 +544,28 @@ def open_ut_pack(req: Optional[PackRequest] = None):
 
 @app.post("/api/ut/recommend")
 def recommend_transfer(req: UTRecommendRequest):
-    club = req.club
-    if not club:
-        return {"success": False, "error": "Club is empty."}
-        
-    # Find weakest player
-    weakest = min(club, key=lambda x: x.get("rating", 99))
-    target_pos = weakest.get("position")
+    # Filter out empty slots from squad
+    valid_squad = [p for p in req.squad if p]
     
+    # Analyze squad first, fallback to club if squad is empty
+    target_players = valid_squad if valid_squad else req.club
+    
+    if not target_players:
+        return {"success": False, "error": "Squad and Club are both empty."}
+
+    # Find weakest player in the starting 11
+    weakest = min(target_players, key=lambda x: x.get("rating", 99))
+    target_pos = weakest.get("position")
+
     global transfer_market_listings
     # Find affordable upgrades in the market
     upgrades = []
     for listing in transfer_market_listings:
         p = listing["player"]
+        price = listing["price"]
         if p.get("position") == target_pos and p.get("rating", 0) > weakest.get("rating", 0):
-            upgrades.append(listing)
+            if price <= req.bankroll:
+                upgrades.append(listing)
             
     if not upgrades:
         return {"success": True, "weakest": weakest, "recommendation": None, "message": f"Your weakest link is {weakest['name']} (Rating: {weakest['rating']}), but no upgrades were found on the market for {target_pos}."}
@@ -420,6 +647,55 @@ def evolve_player(req: EvolveRequest):
     if p["rating"] >= 80 and p.get("rarity") in ["Bronze", "Silver"]:
         p["rarity"] = "Gold"
     return {"success": True, "player": p}
+class UTSimulateRequest(BaseModel):
+    squad: list
+    user_id: Optional[str] = None
+    tactics: Optional[dict] = None
+
+@app.post("/api/ut/simulate_match")
+def ut_simulate_match(req: UTSimulateRequest):
+    # Base AI Team
+    ai_team = {
+        "name": "FC Nexus (AI)",
+        "power": 82,
+        "star": "AI Striker",
+        "league": "Ultimate Team"
+    }
+    
+    # Calculate User UT Team Power based on average rating
+    valid_players = [p for p in req.squad if p]
+    if not valid_players:
+        return {"error": "Squad is empty"}
+        
+    avg_rating = sum(p.get("rating", 70) for p in valid_players) / len(valid_players)
+    
+    # Find star player (highest rating)
+    star_player = max(valid_players, key=lambda x: x.get("rating", 70))
+    
+    user_team = {
+        "name": "My Ultimate Team",
+        "power": avg_rating,
+        "star": star_player.get("name", "Star Player"),
+        "league": "Ultimate Team"
+    }
+    
+    # Load User Tactics directly from payload, or fallback to DB
+    h_tactics = req.tactics
+    if not h_tactics and req.user_id and supabase:
+        try:
+            res = supabase.table("user_tactics").select("*").eq("user_id", req.user_id).execute()
+            if res.data:
+                h_tactics = res.data[0]
+        except Exception as e:
+            print("Error loading tactics for UT match:", e)
+            
+    # Default AI Tactics
+    a_tactics = {"formation": "4-4-2", "style": "Balanced"}
+    
+    from simulation import simulate_match
+    match_result = simulate_match(user_team, ai_team, h_tactics=h_tactics, a_tactics=a_tactics)
+    
+    return {"success": True, "match": match_result}
 
 
 
@@ -466,6 +742,15 @@ def fpl_analyze(req: FPLAnalyzeRequest):
     
     return {"success": True, "report": report}
 
+# @app.post("/api/uefa/refresh-teams")
+# def api_refresh_uefa_teams():
+#     """
+#     Forces a refresh of the UEFA Europa League and Conference League teams
+#     from the API, ensuring they are up to date with the latest playoff results.
+#     """
+#     updated_clubs = refresh_uefa_teams_cache()
+#     return {"success": True, "message": "UEFA teams updated successfully", "clubs": updated_clubs}
+
 
 # --- UEFA Fantasy Endpoints ---
 @app.get("/api/uefa/data")
@@ -490,6 +775,43 @@ def optimize_uefa(req: UEFAOptimizeRequest):
 @app.get("/api/tactics")
 def get_tactics():
     return get_tactics_data()
+
+class TacticsSaveRequest(BaseModel):
+    user_id: str
+    formation: str
+    style: str
+
+@app.post("/api/tactics/save")
+def save_tactics(req: TacticsSaveRequest):
+    if not supabase:
+        return {"error": "Database connection failed"}
+    
+    try:
+        # Upsert user tactics
+        res = supabase.table("user_tactics").upsert({
+            "user_id": req.user_id,
+            "formation": req.formation,
+            "style": req.style,
+            "updated_at": "now()"
+        }).execute()
+        return {"success": True}
+    except Exception as e:
+        print("Error saving tactics:", e)
+        return {"error": str(e)}
+
+@app.get("/api/tactics/load")
+def load_tactics(user_id: str):
+    if not supabase:
+        return {"error": "Database connection failed"}
+        
+    try:
+        res = supabase.table("user_tactics").select("*").eq("user_id", user_id).execute()
+        if res.data:
+            return res.data[0]
+        return {} # No tactics saved yet
+    except Exception as e:
+        print("Error loading tactics:", e)
+        return {"error": str(e)}
 
 # --- PvP Multiplayer Endpoints ---
 pvp_lobbies = {}

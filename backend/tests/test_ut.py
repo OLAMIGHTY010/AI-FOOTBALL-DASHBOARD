@@ -53,3 +53,57 @@ def test_open_ut_pack():
     assert has_gold_or_better
     
     app.dependency_overrides = {}
+
+def test_ut_market():
+    # List a player
+    list_payload = {
+        "player": {"id": "test_1", "name": "Test Player", "rating": 80, "rarity": "Gold"},
+        "price": 1000,
+        "seller_id": "user1"
+    }
+    response = client.post("/api/ut/market/list", json=list_payload)
+    assert response.status_code == 200
+    assert response.json()["success"] == True
+
+    # Check market
+    res_market = client.get("/api/ut/market")
+    listings = res_market.json()["listings"]
+    assert len(listings) >= 1
+    listing_id = listings[-1]["id"]
+
+    # Buy a player
+    buy_payload = {
+        "listing_id": listing_id,
+        "buyer_id": "user2"
+    }
+    res_buy = client.post("/api/ut/market/buy", json=buy_payload)
+    assert res_buy.status_code == 200
+    assert res_buy.json()["success"] == True
+
+def test_ut_sbc():
+    # Submit SBC
+    players = [
+        {"id": f"p{i}", "name": f"P{i}", "rating": 76, "team": f"Team{i % 4}"}
+        for i in range(11)
+    ]
+    res = client.post("/api/ut/sbc/submit", json={"players": players})
+    assert res.status_code == 200
+    assert res.json()["success"] == True
+    assert "reward" in res.json()
+
+def test_ut_evolve():
+    player = {"id": "p1", "name": "Bronze Player", "rating": 64, "rarity": "Bronze"}
+    res = client.post("/api/ut/evolve", json={"player": player})
+    assert res.status_code == 200
+    assert res.json()["success"] == True
+    assert res.json()["player"]["rating"] == 67
+
+def test_ut_simulate_match():
+    squad = [
+        {"id": f"p{i}", "name": f"P{i}", "rating": 80, "position": "MID"}
+        for i in range(11)
+    ]
+    res = client.post("/api/ut/simulate_match", json={"squad": squad, "user_id": "local_user"})
+    assert res.status_code == 200
+    assert res.json()["success"] == True
+    assert "match" in res.json()

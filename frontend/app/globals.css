@@ -14,6 +14,18 @@
   --border-color: rgba(255, 255, 255, 0.08);
 }
 
+.light-theme {
+  --bg-primary: #f8fafc;
+  --bg-secondary: #f1f5f9;
+  --bg-card: #ffffff;
+  --bg-glass: rgba(255, 255, 255, 0.85);
+  --accent-primary: #059669; /* Slightly darker green for contrast */
+  --accent-secondary: #6d28d9;
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --border-color: rgba(0, 0, 0, 0.1);
+}
+
 body {
   background: var(--bg-primary);
   color: var(--text-primary);
@@ -288,4 +300,19 @@ body {
 }
 .animate-walkout-glow {
   animation: walkoutGlow 1.5s ease-out forwards;
+}
+
+@keyframes ticker {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.animate-ticker {
+  animation: ticker 30s linear infinite;
+  display: flex;
+  width: max-content;
+}
+
+.animate-ticker:hover {
+  animation-play-state: paused;
 }

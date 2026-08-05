@@ -3,6 +3,8 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import FPLChat from "./components/FPLChat";
 import FPLLeagues from "./components/FPLLeagues";
+import TransferRecommender from "./components/TransferRecommender";
+import PlayerRadarChart from "./components/PlayerRadarChart";
 
 const API_URL = "http://localhost:8000";
 
@@ -237,6 +239,18 @@ export default function FPLPage() {
     });
   };
 
+  const autoCaptain = () => {
+    if (!squad || !squad.starting_eleven) return;
+    
+    // Find the player with the highest expected points
+    const bestPlayer = [...squad.starting_eleven].sort((a, b) => b.expected_points - a.expected_points)[0];
+    
+    if (bestPlayer) {
+      setCaptain(bestPlayer.id);
+      alert(`🤖 AI Captain Selector chose ${bestPlayer.web_name} with ${bestPlayer.expected_points.toFixed(1)} expected points!`);
+    }
+  };
+
   const renderPlayerNode = (p, isStarter) => {
     const isCaptain = squad.captain && p.id === squad.captain.id;
     const isSelected = selectedPlayerId === p.id;
@@ -304,6 +318,9 @@ export default function FPLPage() {
         </button>
         <button onClick={() => setActiveTab("ai")} className={`px-4 py-2 rounded font-bold ${activeTab === 'ai' ? 'bg-[var(--accent-primary)] text-black' : 'bg-[var(--bg-card)]'}`}>
           🤖 AI Optimizer
+        </button>
+        <button onClick={() => setActiveTab("scout")} className={`px-4 py-2 rounded font-bold ${activeTab === 'scout' ? 'bg-[var(--accent-primary)] text-black' : 'bg-[var(--bg-card)]'}`}>
+          🔍 Scout AI
         </button>
         <button onClick={() => setActiveTab("team")} className={`px-4 py-2 rounded font-bold ${activeTab === 'team' ? 'bg-[var(--accent-primary)] text-black' : 'bg-[var(--bg-card)]'}`}>
           👔 My Team
@@ -416,6 +433,14 @@ export default function FPLPage() {
         </div>
       )}
 
+      {/* Scout AI / Transfer Recommender */}
+      {!loading && activeTab === "scout" && (
+        <div className="max-w-7xl mx-auto grid grid-cols-1 xl:grid-cols-2 gap-6">
+          <TransferRecommender />
+          <PlayerRadarChart players={players} />
+        </div>
+      )}
+
       {/* My Team (Visual Pitch) */}
       {!loading && activeTab === "team" && (
         <div>
@@ -429,6 +454,13 @@ export default function FPLPage() {
               {/* Pitch Area */}
               <div className="flex-1 glass-card bg-gradient-to-b from-[#1e5c36] to-[#123d21] border-[#2d8a4e] p-4 relative overflow-hidden min-h-[600px] flex flex-col justify-between rounded-xl shadow-[inset_0_0_50px_rgba(0,0,0,0.5)]">
                 
+                <button 
+                  onClick={autoCaptain}
+                  className="absolute top-4 right-4 z-20 bg-black/60 hover:bg-black/80 text-white px-4 py-2 rounded-full font-bold border border-[var(--accent-primary)] text-sm shadow-[0_0_15px_rgba(0,255,135,0.3)] transition-transform hover:scale-105"
+                >
+                  🤖 Auto-Captain
+                </button>
+
                 {/* Field Markings */}
                 <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[50%] h-[15%] border-2 border-white/30 rounded-b-lg border-t-0 pointer-events-none"></div>
                 <div className="absolute top-[15%] left-1/2 -translate-x-1/2 w-[25%] h-[6%] border-2 border-white/30 rounded-b-lg border-t-0 pointer-events-none"></div>

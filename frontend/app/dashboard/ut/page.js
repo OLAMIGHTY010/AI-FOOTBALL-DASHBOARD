@@ -109,8 +109,11 @@ export default function PackStorePage() {
               Spend your Sportsbook winnings on packs. Build your ultimate squad!
             </p>
             <div className="flex flex-wrap justify-center gap-4">
-              <Link href="/dashboard/ut/club" className="btn-secondary px-6">View My Club 🏟️</Link>
+              <Link href="/dashboard/ut/club" className="btn-secondary px-6">My Club 🏟️</Link>
+              <Link href="/dashboard/ut/squad" className="btn-secondary px-6 bg-green-900/40 hover:bg-green-800/40 border-green-500">Squad Builder 📋</Link>
               <Link href="/dashboard/ut/market" className="btn-secondary px-6 bg-blue-900/40 hover:bg-blue-800/40 border-blue-500">Transfer Market 💸</Link>
+              <Link href="/dashboard/ut/evolutions" className="btn-secondary px-6 bg-purple-900/40 hover:bg-purple-800/40 border-purple-500">Evolutions 🧬</Link>
+              <Link href="/dashboard/ut/sbc" className="btn-secondary px-6 bg-orange-900/40 hover:bg-orange-800/40 border-orange-500">SBCs 🧩</Link>
             </div>
           </div>
 

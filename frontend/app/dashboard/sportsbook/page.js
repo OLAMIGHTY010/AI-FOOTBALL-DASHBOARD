@@ -35,10 +35,23 @@ function SportsbookPage() {
 
   useEffect(() => {
     fetchFixtures();
-    setPendingBets(JSON.parse(localStorage.getItem("pending_bets") || "[]"));
-    setSettledBets(JSON.parse(localStorage.getItem("settled_bets") || "[]"));
+    fetchBetHistory();
     fetchLeaderboard();
   }, []);
+
+  const fetchBetHistory = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session) {
+      try {
+        const res = await fetch(`${API_URL}/api/bet/history?user_id=${session.user.id}`);
+        const data = await res.json();
+        setPendingBets(data.pending || []);
+        setSettledBets(data.settled || []);
+      } catch (e) {
+        console.error("Failed to fetch bet history", e);
+      }
+    }
+  };
 
   const fetchLeaderboard = async () => {
     try {
@@ -131,41 +144,27 @@ function SportsbookPage() {
       }
       return;
     }
-    
-    // API Call for Phase 3 Parlay
-    if (betSlip.length > 1) {
-      try {
-        await fetch(`${API_URL}/api/bet/parlay`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ legs: betSlip, wager: parseFloat(wager) })
-        });
-      } catch (e) {
-        console.error("Failed to register parlay on backend", e);
-      }
-    }
-    
     const newBankroll = bankroll - wager;
     localStorage.setItem("bankroll", newBankroll.toString());
-    
-    // Dispatch event to update navbar instantly
     window.dispatchEvent(new Event("storage"));
     
-    // Update Supabase wallet
     const { data: { session } } = await supabase.auth.getSession();
     if (session) {
-      await supabase
-        .from("wallets")
-        .update({ balance: newBankroll })
-        .eq("user_id", session.user.id);
+      // The backend API will now handle the Supabase wallet deduction.
+      // API Call for Phase 4 Bets
+      if (betSlip.length > 0) {
+        try {
+          await fetch(`${API_URL}/api/bet/parlay`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ legs: betSlip, wager: parseFloat(wager), user_id: session.user.id })
+          });
+          fetchBetHistory(); // Refresh bets
+        } catch (e) {
+          console.error("Failed to register parlay on backend", e);
+        }
+      }
     }
-
-    // Store pending bets
-    const pending = JSON.parse(localStorage.getItem("pending_bets") || "[]");
-    const newBet = { slip: betSlip, wager, totalOdds, potentialWin, timestamp: Date.now() };
-    pending.push(newBet);
-    localStorage.setItem("pending_bets", JSON.stringify(pending));
-    setPendingBets(pending); // update local state
     
     setBetSlip([]);
     alert(`Bet placed! Wager: $${wager} | Potential Win: $${potentialWin}`);

@@ -153,7 +153,9 @@ def generate_fixtures():
     return fixtures
 
 
-def simulate_match(home_team, away_team, weather='Sunny'):
+from tactics import FORMATIONS, TACTICAL_STYLES
+
+def simulate_match(home_team, away_team, weather='Sunny', h_tactics=None, a_tactics=None):
     """Simulate a full 90-minute match and return the result."""
     match = {
         "home": home_team,
@@ -164,7 +166,9 @@ def simulate_match(home_team, away_team, weather='Sunny'):
         "h_fouls": 0, "a_fouls": 0,
         "red_card": False,
         "h_star_scored": False, "a_star_scored": False,
+        "weather": weather,
         "events": [],
+        "highlights": [],
     }
 
     power_diff = abs(home_team["power"] - away_team["power"])
@@ -173,14 +177,49 @@ def simulate_match(home_team, away_team, weather='Sunny'):
     if weather == 'Rain':
         foul_mod = 1.3
         weather_mod = 0.9
+        match["highlights"].append("0' - It's raining heavily! The pitch is wet and slippery, expect some tough tackles.")
     elif weather == 'Snow':
         weather_mod = 0.7
         foul_mod = 1.1
+        match["highlights"].append("0' - Snow is falling on the pitch. Visibility and ball control might be an issue today.")
+    else:
+        match["highlights"].append("0' - Kickoff! Beautiful sunny conditions for a football match today.")
 
-    h_chance = ((home_team["power"] / 90.0) * 0.02) * weather_mod
-    a_chance = ((away_team["power"] / 90.0) * 0.02) * weather_mod
-    corner_chance = ((home_team["power"] + away_team["power"]) / 180.0 * 0.12) * weather_mod
-    foul_chance = ((1.0 - (power_diff / 50.0)) * 0.25) * foul_mod
+    # Default modifiers
+    h_att_mod = h_def_mod = h_foul_mod = h_corner_mod = 1.0
+    a_att_mod = a_def_mod = a_foul_mod = a_corner_mod = 1.0
+
+    if h_tactics:
+        h_form = FORMATIONS.get(h_tactics.get('formation', '4-3-3'), FORMATIONS['4-3-3'])
+        h_style = TACTICAL_STYLES.get(h_tactics.get('style', 'Balanced'), TACTICAL_STYLES['Balanced'])
+        h_att_mod = h_form['attack_mod'] * h_style['attack_mod']
+        h_def_mod = h_form['defense_mod'] * h_style['defense_mod']
+        h_foul_mod = h_style.get('foul_mod', 1.0)
+        h_corner_mod = h_style.get('corner_mod', 1.0)
+
+    if a_tactics:
+        a_form = FORMATIONS.get(a_tactics.get('formation', '4-3-3'), FORMATIONS['4-3-3'])
+        a_style = TACTICAL_STYLES.get(a_tactics.get('style', 'Balanced'), TACTICAL_STYLES['Balanced'])
+        a_att_mod = a_form['attack_mod'] * a_style['attack_mod']
+        a_def_mod = a_form['defense_mod'] * a_style['defense_mod']
+        a_foul_mod = a_style.get('foul_mod', 1.0)
+        a_corner_mod = a_style.get('corner_mod', 1.0)
+
+    # Calculate chances based on power and tactical mods
+    # h_chance is Home Attack vs Away Defense
+    h_effective_power = home_team["power"] * h_att_mod
+    a_effective_def = away_team["power"] * a_def_mod
+    h_chance = ((h_effective_power / 90.0) * 0.02) * weather_mod * (h_effective_power / max(1, a_effective_def))
+
+    a_effective_power = away_team["power"] * a_att_mod
+    h_effective_def = home_team["power"] * h_def_mod
+    a_chance = ((a_effective_power / 90.0) * 0.02) * weather_mod * (a_effective_power / max(1, h_effective_def))
+
+    avg_corner_mod = (h_corner_mod + a_corner_mod) / 2.0
+    corner_chance = ((home_team["power"] + away_team["power"]) / 180.0 * 0.12) * weather_mod * avg_corner_mod
+    
+    avg_foul_mod = (h_foul_mod + a_foul_mod) / 2.0
+    foul_chance = ((1.0 - (power_diff / 50.0)) * 0.25) * foul_mod * avg_foul_mod
 
     def get_scorer(star_name):
         if random.random() < 0.4:
@@ -199,6 +238,7 @@ def simulate_match(home_team, away_team, weather='Sunny'):
             if scorer == home_team["star"]:
                 match["h_star_scored"] = True
             match["events"].append({"minute": minute, "type": "goal", "team": "home", "player": scorer, "x": random.randint(85, 95), "y": random.randint(40, 60)})
+            match["highlights"].append(f"{minute}' - GOAL for {home_team['name']}! {scorer} finds the back of the net!")
 
         if random.random() < a_chance:
             match["a_goals"] += 1
@@ -206,6 +246,7 @@ def simulate_match(home_team, away_team, weather='Sunny'):
             if scorer == away_team["star"]:
                 match["a_star_scored"] = True
             match["events"].append({"minute": minute, "type": "goal", "team": "away", "player": scorer, "x": random.randint(5, 15), "y": random.randint(40, 60)})
+            match["highlights"].append(f"{minute}' - GOAL for {away_team['name']}! Brilliant finish by {scorer}!")
 
         # Corners
         if random.random() < corner_chance:
@@ -231,10 +272,12 @@ def simulate_match(home_team, away_team, weather='Sunny'):
                 if random.random() < 0.05 and not match["red_card"]:
                     match["red_card"] = True
                     match["events"].append({"minute": minute, "type": "red_card", "team": side, "x": random.randint(20, 80), "y": random.randint(10, 90)})
+                    match["highlights"].append(f"{minute}' - RED CARD! A player from {side} is sent off for a reckless challenge!")
                     # apply suspension
                     team_name = home_team["name"] if side == "home" else away_team["name"]
-                    league_name = home_team["league"]
-                    TEAM_PENALTIES[league_name][team_name]["suspensions"] = 1
+                    league_name = home_team.get("league")
+                    if league_name in TEAM_PENALTIES and team_name in TEAM_PENALTIES[league_name]:
+                        TEAM_PENALTIES[league_name][team_name]["suspensions"] = 1
                 else:
                     if side == "home":
                         match["h_yellows"] += 1
@@ -246,9 +289,11 @@ def simulate_match(home_team, away_team, weather='Sunny'):
             if random.random() < 0.02:
                 injured_side = "away" if side == "home" else "home"
                 match["events"].append({"minute": minute, "type": "injury", "team": injured_side, "x": random.randint(20, 80), "y": random.randint(10, 90)})
+                match["highlights"].append(f"{minute}' - INJURY! A {injured_side} player goes down holding his leg and has to be subbed off.")
                 team_name = home_team["name"] if injured_side == "home" else away_team["name"]
-                league_name = home_team["league"]
-                TEAM_PENALTIES[league_name][team_name]["injuries"] = 2
+                league_name = home_team.get("league")
+                if league_name in TEAM_PENALTIES and team_name in TEAM_PENALTIES[league_name]:
+                    TEAM_PENALTIES[league_name][team_name]["injuries"] = 2
 
     return match
 
