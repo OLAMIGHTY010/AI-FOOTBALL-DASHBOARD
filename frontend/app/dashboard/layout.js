@@ -17,6 +17,7 @@ const NAV_ITEMS = [
   { href: "/dashboard/simulate", label: "Virtual Hub", id: "virtualHub" },
   { href: "/dashboard/ut", label: "Ultimate Team", id: "ultimateTeam" },
   { href: "/dashboard/fpl", label: "FPL Hub", id: "fplHub" },
+  { href: "/dashboard/analytics", label: "Analytics", id: "analytics" },
   { href: "/dashboard/leaderboards", label: "Global Ranks", id: "globalRanks" },
   { href: "/dashboard/chat", label: "Global Chat", id: "globalChat" },
   { href: "/dashboard/profile", label: "Profile", id: "profile" },
@@ -38,6 +39,7 @@ export default function DashboardLayout({ children }) {
                    pathname.startsWith("/dashboard/more");
 
   const isVirtualApp = pathname.startsWith("/dashboard/simulate");
+  const isAnalyticsApp = pathname.startsWith("/dashboard/analytics");
 
   useEffect(() => {
     const checkUser = async () => {
@@ -240,6 +242,26 @@ export default function DashboardLayout({ children }) {
             </Link>
             <Link href="/dashboard/simulate/live" className={`px-6 py-3 font-bold text-sm whitespace-nowrap transition-colors ${pathname.includes('/live') ? 'text-white border-b-2 border-[#00ff87]' : 'text-gray-400 hover:text-white'}`}>
               🔴 Live In-Play
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {/* Analytics Sub-Navbar */}
+      {isAnalyticsApp && (
+        <div className="bg-[#162032] border-b border-gray-800 shadow-md">
+          <div className="max-w-7xl mx-auto flex items-center overflow-x-auto">
+            <Link href="/dashboard/analytics" className={`px-6 py-3 font-bold text-sm whitespace-nowrap transition-colors ${pathname === '/dashboard/analytics' ? 'text-white border-b-2 border-blue-400' : 'text-gray-400 hover:text-white'}`}>
+              📊 Hub
+            </Link>
+            <Link href="/dashboard/analytics/compare" className={`px-6 py-3 font-bold text-sm whitespace-nowrap transition-colors ${pathname.includes('/compare') ? 'text-white border-b-2 border-blue-400' : 'text-gray-400 hover:text-white'}`}>
+              🆚 Compare
+            </Link>
+            <Link href="/dashboard/analytics/heatmap" className={`px-6 py-3 font-bold text-sm whitespace-nowrap transition-colors ${pathname.includes('/heatmap') ? 'text-white border-b-2 border-blue-400' : 'text-gray-400 hover:text-white'}`}>
+              🔥 Heat Map
+            </Link>
+            <Link href="/dashboard/analytics/form" className={`px-6 py-3 font-bold text-sm whitespace-nowrap transition-colors ${pathname.includes('/form') ? 'text-white border-b-2 border-blue-400' : 'text-gray-400 hover:text-white'}`}>
+              📈 Form & Trends
             </Link>
           </div>
         </div>
