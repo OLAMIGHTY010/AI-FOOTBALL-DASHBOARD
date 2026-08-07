@@ -582,35 +582,8 @@ def recommend_transfer(req: UTRecommendRequest):
 
 
 # --- Ultimate Team Transfer Market ---
-transfer_market_listings = []
-
-@app.get("/api/ut/market")
-def get_market():
-    return {"listings": transfer_market_listings}
-
-@app.post("/api/ut/market/list")
-def list_on_market(req: MarketListRequest):
-    listing_id = str(uuid.uuid4())
-    listing = {
-        "id": listing_id,
-        "player": req.player,
-        "price": req.price,
-        "seller_id": req.seller_id,
-        "listed_at": str(datetime.now())
-    }
-    transfer_market_listings.append(listing)
-    return {"success": True, "listing": listing}
-
-@app.post("/api/ut/market/buy")
-def buy_from_market(req: MarketBuyRequest):
-    global transfer_market_listings
-    for listing in transfer_market_listings:
-        if listing["id"] == req.listing_id:
-            # Here we just remove it from the market. 
-            # The frontend deducts balance and adds to club.
-            transfer_market_listings = [l for l in transfer_market_listings if l["id"] != req.listing_id]
-            return {"success": True, "player": listing["player"], "seller_id": listing["seller_id"], "price": listing["price"]}
-    raise HTTPException(status_code=404, detail="Listing not found or already sold")
+# The transfer market has been completely migrated to PostgreSQL/Supabase!
+# All logic for listing and buying is handled securely via the DB and RPC functions.
 
 # --- Ultimate Team SBC ---
 @app.post("/api/ut/sbc/submit")

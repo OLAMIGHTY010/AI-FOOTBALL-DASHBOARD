@@ -3,173 +3,171 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useAppContext } from "@/app/context/AppContext";
-
-const API_URL = "http://localhost:8000";
+import { supabase } from "@/lib/supabaseClient";
 
 export default function TransferMarketPage() {
-  const { aiCoins, addCoins, deductCoins } = useAppContext();
+  const { user, aiCoins, deductCoins, syncGameState } = useAppContext();
   const [listings, setListings] = useState([]);
-  const [myClub, setMyClub] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [sellMode, setSellMode] = useState(false);
+  const [processing, setProcessing] = useState(false);
 
   useEffect(() => {
     fetchMarket();
-    const club = JSON.parse(localStorage.getItem('my_club') || '[]');
-    setMyClub(club);
   }, []);
 
   const fetchMarket = async () => {
     try {
-      const res = await fetch(`${API_URL}/api/ut/market`);
-      const data = await res.json();
-      setListings(data.listings || []);
-      setLoading(false);
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('transfer_market')
+        .select(`
+          id,
+          card,
+          price,
+          seller_id,
+          profiles:seller_id (username)
+        `)
+        .eq('status', 'active')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setListings(data || []);
     } catch (err) {
       console.error("Failed to fetch market:", err);
+    } finally {
       setLoading(false);
     }
   };
 
   const buyPlayer = async (listing) => {
+    if (!user) {
+      alert("You must be logged in to use the transfer market.");
+      return;
+    }
+    if (user.id === listing.seller_id) {
+      alert("You cannot buy your own listing!");
+      return;
+    }
     if (aiCoins < listing.price) {
       alert("Not enough AI Coins!");
       return;
     }
 
+    setProcessing(true);
     try {
-      const res = await fetch(`${API_URL}/api/ut/market/buy`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ listing_id: listing.id, buyer_id: "local_user" })
+      const { data, error } = await supabase.rpc('execute_transfer', {
+        p_listing_id: listing.id,
+        p_buyer_id: user.id
       });
-      const data = await res.json();
+
+      if (error) throw error;
       
-      if (data.success) {
+      if (data && data.success) {
+        // Transfer successful on backend
+        alert(`Successfully bought ${listing.card.name}!`);
+        
+        // Update local context
         deductCoins(listing.price);
-        const newClub = [...myClub, listing.player];
-        setMyClub(newClub);
-        localStorage.setItem("my_club", JSON.stringify(newClub));
-        fetchMarket(); // Refresh market
-        alert(`Successfully bought ${listing.player.name}!`);
-      }
-    } catch (err) {
-      console.error(err);
-      alert("Failed to buy player.");
-    }
-  };
-
-  const listPlayer = async (player) => {
-    const price = prompt(`Enter listing price for ${player.name} (Suggested: ${player.sell_value * 2}):`);
-    if (!price || isNaN(price) || parseFloat(price) <= 0) return;
-
-    const numPrice = parseFloat(price);
-
-    try {
-      const res = await fetch(`${API_URL}/api/ut/market/list`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ player: player, price: numPrice, seller_id: "local_user" })
-      });
-      const data = await res.json();
-      
-      if (data.success) {
-        // Remove from club locally
-        const newClub = myClub.filter(p => p.id !== player.id);
-        setMyClub(newClub);
-        localStorage.setItem("my_club", JSON.stringify(newClub));
+        
+        // Update local club state
+        const currentClub = JSON.parse(localStorage.getItem('ut_club') || '[]');
+        const newClub = [...currentClub, data.card];
+        localStorage.setItem('ut_club', JSON.stringify(newClub));
+        // Note: The RPC already updated the DB, so we don't strictly need to sync it up, 
+        // but calling syncGameState keeps Context happy. We could just rely on context reloading,
+        // but let's push the new state to Context.
+        syncGameState('ut_club', newClub);
+        
+        // Refresh market listings
         fetchMarket();
-        alert(`Listed ${player.name} on the market! (Wait for someone to buy it)`);
       }
     } catch (err) {
       console.error(err);
+      alert(err.message || "Failed to buy player. They might have already been sold!");
+    } finally {
+      setProcessing(false);
     }
   };
 
   const getRarityColor = (rarity) => {
     switch (rarity) {
-      case "Icon": return "text-white bg-gradient-to-r from-gray-300 to-gray-500 border-white";
-      case "Gold": return "text-yellow-900 bg-gradient-to-r from-yellow-300 to-yellow-600 border-yellow-300";
-      case "Silver": return "text-gray-900 bg-gradient-to-r from-gray-300 to-gray-400 border-gray-300";
-      case "Bronze": return "text-orange-900 bg-gradient-to-r from-orange-300 to-orange-500 border-orange-300";
-      default: return "text-white bg-gray-700 border-gray-600";
+      case 'Bronze': return 'from-[#cd7f32] to-[#8b5a2b]';
+      case 'Silver': return 'from-[#e6e8fa] to-[#8a8d91]';
+      case 'Gold': return 'from-[#ffd700] to-[#b8860b]';
+      case 'Icon': return 'from-[#fff] to-[#d4af37] border border-[#d4af37]';
+      default: return 'from-gray-600 to-gray-800';
     }
   };
 
   return (
-    <div className="max-w-7xl mx-auto p-4 space-y-6 animate-fade-in">
-      <div className="flex justify-between items-center">
+    <div className="p-6 animate-fade-in max-w-6xl mx-auto">
+      <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="text-3xl font-black mb-2">💸 Transfer Market</h1>
-          <p className="text-[var(--text-secondary)]">Buy and sell players with other managers.</p>
+          <h1 className="text-3xl font-black gradient-text">Transfer Market</h1>
+          <p className="text-[var(--text-secondary)] font-bold">Buy and sell players with other managers.</p>
         </div>
-        <div className="flex gap-4">
-          <button 
-            onClick={() => setSellMode(!sellMode)} 
-            className={`btn-secondary ${sellMode ? 'bg-[var(--accent-primary)] text-black' : ''}`}
-          >
-            {sellMode ? 'Cancel Selling' : 'List My Players'}
-          </button>
-          <Link href="/dashboard/ut" className="btn-primary">Back to Hub</Link>
+        <div className="flex items-center gap-4">
+          <div className="glass-card flex items-center gap-2 !py-2 !px-4">
+            <span className="text-xl">🪙</span>
+            <span className="font-black text-xl text-[var(--accent-primary)]">{aiCoins.toLocaleString()}</span>
+          </div>
+          <Link href="/dashboard/ut/club" className="btn-primary">
+            Sell Players
+          </Link>
         </div>
       </div>
 
-      {sellMode ? (
-        <div className="glass-card p-6">
-          <h2 className="text-2xl font-bold mb-4">Select Player to List</h2>
-          {myClub.length === 0 ? (
-            <p className="text-[var(--text-secondary)]">Your club is empty.</p>
-          ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-              {myClub.map((p, idx) => (
-                <div key={idx} className={`border-2 rounded-lg p-3 text-center cursor-pointer transition-transform hover:scale-105 shadow-lg ${getRarityColor(p.rarity)}`} onClick={() => listPlayer(p)}>
-                  <div className="font-black text-2xl">{p.rating}</div>
-                  <div className="font-bold text-sm truncate">{p.name}</div>
-                  <div className="text-xs opacity-80">{p.position}</div>
-                  <div className="mt-2 text-xs font-black bg-black/20 rounded py-1 border border-black/10">Est: {p.sell_value} Coins</div>
-                </div>
-              ))}
-            </div>
-          )}
+      <div className="flex gap-4 mb-6">
+        <button onClick={fetchMarket} className="btn-secondary flex items-center gap-2">
+          <span>🔄</span> Refresh Market
+        </button>
+      </div>
+
+      {loading ? (
+        <div className="glass-card p-12 text-center text-xl font-bold animate-pulse text-[var(--text-secondary)]">
+          Scouting the market...
         </div>
       ) : (
-        <div className="glass-card p-6">
-          <h2 className="text-2xl font-bold mb-4 border-b border-[var(--border-color)] pb-2 flex justify-between">
-            <span>Live Listings</span>
-            <button onClick={fetchMarket} className="text-sm font-normal text-[var(--accent-primary)] hover:underline">Refresh</button>
-          </h2>
-          
-          {loading ? (
-            <div className="text-center py-10 animate-pulse">Loading market data...</div>
-          ) : listings.length === 0 ? (
-            <div className="text-center py-10 text-[var(--text-secondary)]">
-              No players currently listed on the market.<br/>
-              Be the first to list a player!
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-              {listings.map(listing => (
-                <div key={listing.id} className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg p-4 flex justify-between items-center group hover:border-[var(--accent-primary)] transition-colors">
-                  <div className="flex gap-4 items-center">
-                    <div className={`w-16 h-20 rounded border-2 flex flex-col justify-center items-center shadow ${getRarityColor(listing.player.rarity)}`}>
-                      <span className="font-black text-xl">{listing.player.rating}</span>
-                      <span className="text-[10px] font-bold">{listing.player.position}</span>
-                    </div>
-                    <div>
-                      <div className="font-bold text-lg">{listing.player.name}</div>
-                      <div className="text-sm text-[var(--text-secondary)]">{listing.player.rarity}</div>
-                      <div className="text-xs text-[var(--text-secondary)] mt-1">Listed by: {listing.seller_id === 'local_user' ? 'You' : (listing.seller_id ? listing.seller_id.substring(0, 6) : 'System')}</div>
-                    </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          {listings.map((listing, index) => {
+            const p = listing.card;
+            return (
+              <div key={listing.id} className="glass-card !p-0 overflow-hidden group hover:scale-105 transition-transform duration-300 relative">
+                <div className={`h-24 bg-gradient-to-br ${getRarityColor(p.rarity)} p-4 flex flex-col justify-end relative overflow-hidden`}>
+                  <div className="absolute top-2 right-2 text-3xl font-black opacity-30">{p.rating}</div>
+                  <div className="absolute top-2 left-2 text-sm font-bold bg-black/50 px-2 rounded backdrop-blur-sm">
+                    {p.position}
                   </div>
+                  <h3 className="font-black text-xl text-white drop-shadow-md relative z-10">{p.name}</h3>
+                </div>
+                
+                <div className="p-4">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-[var(--text-secondary)] font-bold text-sm">Seller</span>
+                    <span className="font-bold">{listing.profiles?.username || 'Unknown'}</span>
+                  </div>
+                  <div className="flex justify-between items-center mb-4">
+                    <span className="text-[var(--text-secondary)] font-bold text-sm">Buy Now Price</span>
+                    <span className="font-black text-[var(--accent-primary)] text-lg">${listing.price.toLocaleString()}</span>
+                  </div>
+                  
                   <button 
                     onClick={() => buyPlayer(listing)}
-                    disabled={listing.seller_id === 'local_user'}
-                    className={`font-bold px-4 py-2 rounded ${listing.seller_id === 'local_user' ? 'bg-gray-700 cursor-not-allowed opacity-50' : 'bg-green-600 hover:bg-green-500 text-white'}`}
+                    disabled={processing || (user && user.id === listing.seller_id)}
+                    className="w-full btn-primary !py-2 flex items-center justify-center gap-2"
                   >
-                    Buy <br/> 💳 {listing.price}
+                    <span>💸</span> {processing ? 'Processing...' : 'Buy Now'}
                   </button>
                 </div>
-              ))}
+              </div>
+            );
+          })}
+          
+          {listings.length === 0 && (
+            <div className="col-span-full glass-card p-12 text-center">
+              <span className="text-4xl mb-4 block">🏜️</span>
+              <h3 className="text-xl font-bold mb-2">The market is quiet...</h3>
+              <p className="text-[var(--text-secondary)]">No players are currently listed for sale.</p>
             </div>
           )}
         </div>
