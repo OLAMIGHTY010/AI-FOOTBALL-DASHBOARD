@@ -158,7 +158,7 @@ export default function TransferMarketPage() {
                     <div>
                       <div className="font-bold text-lg">{listing.player.name}</div>
                       <div className="text-sm text-[var(--text-secondary)]">{listing.player.rarity}</div>
-                      <div className="text-xs text-[var(--text-secondary)] mt-1">Listed by: {listing.seller_id === 'local_user' ? 'You' : listing.seller_id[:6]}</div>
+                      <div className="text-xs text-[var(--text-secondary)] mt-1">Listed by: {listing.seller_id === 'local_user' ? 'You' : (listing.seller_id ? listing.seller_id.substring(0, 6) : 'System')}</div>
                     </div>
                   </div>
                   <button 

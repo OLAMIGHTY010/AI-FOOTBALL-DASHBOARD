@@ -8,6 +8,7 @@ import LiveTicker from "@/app/dashboard/components/LiveTicker";
 import CommandPalette from "@/app/components/CommandPalette";
 import AIChatbot from "@/app/dashboard/components/AIChatbot";
 import NotificationBell from "@/app/dashboard/components/NotificationBell";
+import MobileBottomNav from "@/app/components/MobileBottomNav";
 import { translations } from "@/lib/translations";
 
 const API_URL = "http://localhost:8000";
@@ -155,7 +156,7 @@ export default function DashboardLayout({ children }) {
             <select 
               value={language} 
               onChange={(e) => changeLanguage(e.target.value)}
-              className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-md px-2 py-1 text-xs text-[var(--text-primary)]"
+              className="hidden md:block bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-md px-2 py-1 text-xs text-[var(--text-primary)]"
             >
               <option value="en">EN</option>
               <option value="es">ES</option>
@@ -163,7 +164,7 @@ export default function DashboardLayout({ children }) {
             </select>
 
             {/* Toggles */}
-            <div className="flex items-center gap-2 mr-2">
+            <div className="hidden md:flex items-center gap-2 mr-2">
               <NotificationBell />
               <button 
                 onClick={toggleTheme} 
@@ -179,6 +180,10 @@ export default function DashboardLayout({ children }) {
               >
                 {soundEnabled ? '🔊' : '🔇'}
               </button>
+            </div>
+            {/* Mobile Notification Bell (only bell visible on mobile header) */}
+            <div className="md:hidden flex items-center mr-2">
+              <NotificationBell />
             </div>
 
             {/* User */}
@@ -287,12 +292,15 @@ export default function DashboardLayout({ children }) {
       )}
 
       {/* Content */}
-      <main className="flex-1 max-w-7xl mx-auto w-full px-4 py-6 mb-12">
+      <main className="flex-1 max-w-7xl mx-auto w-full px-4 py-6 mb-20 md:mb-12">
         {children}
       </main>
 
       {/* Live Ticker */}
       <LiveTicker />
+
+      {/* Mobile Bottom Nav */}
+      <MobileBottomNav />
 
       {/* AI Chatbot Assistant */}
       <AIChatbot />
