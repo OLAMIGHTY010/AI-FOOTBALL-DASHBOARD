@@ -14,6 +14,7 @@ const API_URL = "http://localhost:8000";
 
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", id: "dashboard" },
+  { href: "/dashboard/season", label: "Season Mode", id: "seasonMode" },
   { href: "/dashboard/simulate", label: "Virtual Hub", id: "virtualHub" },
   { href: "/dashboard/ut", label: "Ultimate Team", id: "ultimateTeam" },
   { href: "/dashboard/fpl", label: "FPL Hub", id: "fplHub" },
@@ -40,6 +41,7 @@ export default function DashboardLayout({ children }) {
 
   const isVirtualApp = pathname.startsWith("/dashboard/simulate");
   const isAnalyticsApp = pathname.startsWith("/dashboard/analytics");
+  const isSeasonApp = pathname.startsWith("/dashboard/season");
 
   useEffect(() => {
     const checkUser = async () => {
@@ -262,6 +264,23 @@ export default function DashboardLayout({ children }) {
             </Link>
             <Link href="/dashboard/analytics/form" className={`px-6 py-3 font-bold text-sm whitespace-nowrap transition-colors ${pathname.includes('/form') ? 'text-white border-b-2 border-blue-400' : 'text-gray-400 hover:text-white'}`}>
               📈 Form & Trends
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {/* Season Sub-Navbar */}
+      {isSeasonApp && (
+        <div className="bg-[#162032] border-b border-gray-800 shadow-md">
+          <div className="max-w-7xl mx-auto flex items-center overflow-x-auto">
+            <Link href="/dashboard/season" className={`px-6 py-3 font-bold text-sm whitespace-nowrap transition-colors ${pathname === '/dashboard/season' ? 'text-white border-b-2 border-yellow-400' : 'text-gray-400 hover:text-white'}`}>
+              🏠 Season Hub
+            </Link>
+            <Link href="/dashboard/season/standings" className={`px-6 py-3 font-bold text-sm whitespace-nowrap transition-colors ${pathname.includes('/standings') ? 'text-white border-b-2 border-yellow-400' : 'text-gray-400 hover:text-white'}`}>
+              📊 Standings
+            </Link>
+            <Link href="/dashboard/season/futures" className={`px-6 py-3 font-bold text-sm whitespace-nowrap transition-colors ${pathname.includes('/futures') ? 'text-white border-b-2 border-yellow-400' : 'text-gray-400 hover:text-white'}`}>
+              💰 Futures Betting
             </Link>
           </div>
         </div>
