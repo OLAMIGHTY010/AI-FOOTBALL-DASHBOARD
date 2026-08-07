@@ -2,14 +2,16 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
+import { useAppContext } from "@/app/context/AppContext";
 
 const API_URL = "http://localhost:8000";
 
 export default function MyClubPage() {
+  const { user, addCoins, syncGameState } = useAppContext();
   const [club, setClub] = useState([]);
 
   useEffect(() => {
-    setClub(JSON.parse(localStorage.getItem("my_club") || "[]"));
+    setClub(JSON.parse(localStorage.getItem("ut_club") || "[]"));
   }, []);
 
   const sellCard = async (index, value) => {
@@ -17,17 +19,11 @@ export default function MyClubPage() {
     const newClub = [...club];
     newClub.splice(index, 1);
     setClub(newClub);
-    localStorage.setItem("my_club", JSON.stringify(newClub));
+    localStorage.setItem("ut_club", JSON.stringify(newClub));
+    if (user) syncGameState("ut_club", newClub);
 
     // Give money
-    let currentBankroll = parseFloat(localStorage.getItem("bankroll") || "0");
-    currentBankroll += value;
-    localStorage.setItem("bankroll", currentBankroll.toString());
-
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session) {
-      await supabase.from("wallets").update({ balance: currentBankroll }).eq("user_id", session.user.id);
-    }
+    addCoins(value);
   };
 
   const listOnMarket = async (index, card) => {

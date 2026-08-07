@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
+import { useAppContext } from "@/app/context/AppContext";
 
 const API_URL = "http://localhost:8000";
 
@@ -13,20 +14,16 @@ const PACKS = [
 ];
 
 export default function PackStorePage() {
-  const [bankroll, setBankroll] = useState(0);
+  const { user, aiCoins, deductCoins, syncGameState } = useAppContext();
   const [pulledCards, setPulledCards] = useState(null);
   const [loading, setLoading] = useState(false);
   const [packStage, setPackStage] = useState(0); // 0 = store, 1 = suspense, 2 = walkout, 3 = reveal
   const [walkoutMsg, setWalkoutMsg] = useState("");
   const [flippedCards, setFlippedCards] = useState({});
 
-  useEffect(() => {
-    setBankroll(parseFloat(localStorage.getItem("bankroll") || "0"));
-  }, []);
-
   const openPack = async (pack) => {
-    if (bankroll < pack.price) {
-      alert("Insufficient funds! Use the Sportsbook to win more or click the deposit button.");
+    if (!deductCoins(pack.price)) {
+      alert("Insufficient funds! Win more coins in the Virtual Hub or claim Daily Rewards.");
       return;
     }
 
@@ -34,15 +31,6 @@ export default function PackStorePage() {
     setPulledCards(null);
     setPackStage(1); // Suspense
     setFlippedCards({});
-
-    const newBankroll = bankroll - pack.price;
-    setBankroll(newBankroll);
-    localStorage.setItem("bankroll", newBankroll.toString());
-
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session) {
-      await supabase.from("wallets").update({ balance: newBankroll }).eq("user_id", session.user.id);
-    }
 
     try {
       const res = await fetch(`${API_URL}/api/ut/pack`, {
@@ -56,8 +44,10 @@ export default function PackStorePage() {
       const hasIcon = cards.some(c => c.rarity === 'Icon');
       const hasGold = cards.some(c => c.rarity === 'Gold');
       
-      const club = JSON.parse(localStorage.getItem('my_club') || '[]');
-      localStorage.setItem('my_club', JSON.stringify([...club, ...cards]));
+      const club = JSON.parse(localStorage.getItem('ut_club') || '[]');
+      const newClub = [...club, ...cards];
+      localStorage.setItem('ut_club', JSON.stringify(newClub));
+      if (user) syncGameState('ut_club', newClub);
 
       setTimeout(() => {
         if (hasIcon || hasGold) {

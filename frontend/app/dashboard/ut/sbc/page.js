@@ -2,10 +2,12 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useAppContext } from "@/app/context/AppContext";
 
 const API_URL = "http://localhost:8000";
 
 export default function SBCPage() {
+  const { user, syncGameState } = useAppContext();
   const [myClub, setMyClub] = useState([]);
   const [selectedPlayers, setSelectedPlayers] = useState([]);
   const [reward, setReward] = useState(null);
@@ -13,7 +15,7 @@ export default function SBCPage() {
   const [errorMsg, setErrorMsg] = useState("");
 
   useEffect(() => {
-    const club = JSON.parse(localStorage.getItem('my_club') || '[]');
+    const club = JSON.parse(localStorage.getItem('ut_club') || '[]');
     setMyClub(club);
   }, []);
 
@@ -50,13 +52,14 @@ export default function SBCPage() {
       
       if (data.success) {
         // Remove submitted players from club
-        const submittedIds = selectedPlayers.map(p => p.id);
-        const newClub = myClub.filter(p => !submittedIds.includes(p.id));
+        const usedIds = new Set(selectedPlayers.map(p => p.id));
+        const remainingClub = myClub.filter(p => !usedIds.has(p.id));
         
         // Add rewards to club
-        const finalClub = [...newClub, ...data.reward];
+        const finalClub = [...remainingClub, ...data.reward];
         setMyClub(finalClub);
-        localStorage.setItem("my_club", JSON.stringify(finalClub));
+        localStorage.setItem("ut_club", JSON.stringify(finalClub));
+        if (user) syncGameState("ut_club", finalClub);
         
         setReward(data.reward);
         setSelectedPlayers([]);

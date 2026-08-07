@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useAppContext } from "@/app/context/AppContext";
 
 const FORMATIONS = {
   "4-4-2": [
@@ -58,28 +59,30 @@ const FORMATIONS = {
 };
 
 export default function SquadBuilderPage() {
+  const { user, syncGameState } = useAppContext();
   const [club, setClub] = useState([]);
   const [squad, setSquad] = useState(Array(11).fill(null));
   const [activeSlot, setActiveSlot] = useState(null);
   const [formationId, setFormationId] = useState("4-4-2");
 
   useEffect(() => {
-    setClub(JSON.parse(localStorage.getItem("my_club") || "[]"));
-    const savedSquad = JSON.parse(localStorage.getItem("my_squad") || "null");
-    if (savedSquad && savedSquad.length === 11) {
-      setSquad(savedSquad);
-    }
-    const savedFormation = localStorage.getItem("my_formation");
-    if (savedFormation && FORMATIONS[savedFormation]) {
-      setFormationId(savedFormation);
+    setClub(JSON.parse(localStorage.getItem("ut_club") || "[]"));
+    const savedSquadState = JSON.parse(localStorage.getItem("ut_active_squad") || "{}");
+    if (savedSquadState.squad && savedSquadState.squad.length === 11) {
+      setSquad(savedSquadState.squad);
+      setFormationId(savedSquadState.formation || "4-4-2");
     }
   }, []);
 
   const saveSquad = (newSquad, newFormation = formationId) => {
     setSquad(newSquad);
     setFormationId(newFormation);
-    localStorage.setItem("my_squad", JSON.stringify(newSquad));
-    localStorage.setItem("my_formation", newFormation);
+    
+    const squadState = { squad: newSquad, formation: newFormation };
+    localStorage.setItem("ut_active_squad", JSON.stringify(squadState));
+    if (user) {
+      syncGameState("active_squad", squadState);
+    }
   };
 
   const handleSlotClick = (index) => {
