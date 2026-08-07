@@ -116,6 +116,15 @@ export default function PackStorePage() {
               <Link href="/dashboard/ut/sbc" className="btn-secondary px-6 bg-orange-900/40 hover:bg-orange-800/40 border-orange-500">SBCs 🧩</Link>
             </div>
           </div>
+          
+          <div className="mb-12">
+            <Link href="/dashboard/ut/battle" className="block w-full">
+              <div className="bg-gradient-to-r from-red-900/60 to-purple-900/60 border-2 border-red-500 rounded-2xl p-8 text-center hover:scale-[1.02] transition-transform shadow-[0_0_30px_rgba(239,68,68,0.3)]">
+                <h2 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-red-400 to-yellow-400 mb-2">⚔️ Enter the Card Battle Arena! ⚔️</h2>
+                <p className="text-white text-lg font-bold">Play your Squad against the AI in a Top Trumps style TCG mini-game to win Coins!</p>
+              </div>
+            </Link>
+          </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-12">
             {PACKS.map(pack => (
