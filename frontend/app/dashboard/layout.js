@@ -26,12 +26,10 @@ const NAV_ITEMS = [
 ];
 
 export default function DashboardLayout({ children }) {
-  const [user, setUser] = useState(null);
-  const [bankroll, setBankroll] = useState(0);
   const [debt, setDebt] = useState(0);
   const [loading, setLoading] = useState(true);
   const pathname = usePathname();
-  const { theme, toggleTheme, soundEnabled, toggleSound, language, changeLanguage } = useAppContext();
+  const { user, isLoadingAuth, theme, toggleTheme, soundEnabled, toggleSound, language, changeLanguage, aiCoins, addCoins } = useAppContext();
   const t = translations[language] || translations['en'];
 
   const isFPLApp = pathname.startsWith("/dashboard/fpl") || 
@@ -45,64 +43,28 @@ export default function DashboardLayout({ children }) {
   const isSeasonApp = pathname.startsWith("/dashboard/season");
 
   useEffect(() => {
-    const checkUser = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
+    if (!isLoadingAuth) {
+      if (!user) {
         window.location.href = "/";
-        return;
-      }
-      
-      setUser(session.user);
-      
-      // Fetch wallet balance
-      const { data: walletData, error } = await supabase
-        .from("wallets")
-        .select("balance")
-        .eq("user_id", session.user.id)
-        .single();
-        
-      if (walletData) {
-        setBankroll(parseFloat(walletData.balance));
-        // Keep in local storage for simulate page if needed, but ideally we'd pass it down
-        localStorage.setItem("bankroll", walletData.balance.toString());
       } else {
-        // Fallback or handle missing wallet
-        setBankroll(1000);
+        setLoading(false);
       }
-      
-      setLoading(false);
-    };
+    }
     
-    checkUser();
-
-    // Listen for cross-component and cross-tab bankroll updates
-    const syncBankroll = () => {
-      const bal = localStorage.getItem("bankroll");
-      if (bal) {
-        setBankroll(parseFloat(bal));
-      }
+    // Listen for cross-tab debt updates (if needed)
+    const syncDebt = () => {
       const db = localStorage.getItem("virtual_debt");
       if (db) {
         setDebt(parseFloat(db));
       }
     };
-    window.addEventListener("storage", syncBankroll);
-    return () => window.removeEventListener("storage", syncBankroll);
-  }, []);
+    window.addEventListener("storage", syncDebt);
+    return () => window.removeEventListener("storage", syncDebt);
+  }, [user, isLoadingAuth]);
 
   const handleDeposit = async () => {
     if (!user) return;
-    const newBal = bankroll + 1000;
-    
-    // Update local state immediately
-    setBankroll(newBal);
-    localStorage.setItem("bankroll", newBal.toString());
-    
-    // Update Supabase
-    await supabase
-      .from("wallets")
-      .update({ balance: newBal })
-      .eq("user_id", user.id);
+    addCoins(1000);
   };
 
   const handleLogout = async () => {
@@ -111,8 +73,14 @@ export default function DashboardLayout({ children }) {
     window.location.href = "/";
   };
 
-  if (loading || !user) return <div className="min-h-screen flex items-center justify-center text-[var(--text-secondary)]">Loading dashboard...</div>;
-
+  if (loading || isLoadingAuth) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[var(--bg-primary)]">
+        <div className="text-4xl animate-bounce mb-4">⚽</div>
+        <div className="text-[var(--accent-primary)] font-bold tracking-widest text-sm uppercase">Warming up...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -142,7 +110,7 @@ export default function DashboardLayout({ children }) {
             <div className="glass-card !p-2 !px-4 flex items-center gap-3">
               <span className="text-sm text-[var(--text-secondary)]">💳</span>
               <span className="font-bold text-[var(--accent-primary)]">
-                ${bankroll.toFixed(2)}
+                ${aiCoins.toFixed(2)}
               </span>
             </div>
             <button

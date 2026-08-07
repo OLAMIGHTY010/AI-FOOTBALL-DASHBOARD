@@ -1,6 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabaseClient';
 
 const AppContext = createContext();
 
@@ -9,25 +10,99 @@ export function AppProvider({ children }) {
   const [aiCoins, setAiCoins] = useState(1000);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [language, setLanguage] = useState('en');
+  const [user, setUser] = useState(null);
+  const [isLoadingAuth, setIsLoadingAuth] = useState(true);
 
   // Daily Rewards
   const [showDailyRewardModal, setShowDailyRewardModal] = useState(false);
   const [loginStreak, setLoginStreak] = useState(0);
   const [dailyRewardAmount, setDailyRewardAmount] = useState(0);
 
-  // Initialize from localStorage
+  // Supabase Auth & Fetch
+  useEffect(() => {
+    // Check active session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      setIsLoadingAuth(false);
+      if (session?.user) {
+        fetchUserProfile(session.user.id);
+      }
+    });
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+      setIsLoadingAuth(false);
+      if (session?.user) {
+        fetchUserProfile(session.user.id);
+      } else {
+        // Logged out
+        setAiCoins(1000);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const fetchUserProfile = async (userId) => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+      
+      if (error) throw error;
+      if (data) {
+        setAiCoins(parseFloat(data.bankroll || data.ai_coins || 1000));
+        
+        // Sync JSON states down to localStorage
+        if (data.ut_club) localStorage.setItem('ut_club', JSON.stringify(data.ut_club));
+        if (data.active_squad) localStorage.setItem('ut_active_squad', JSON.stringify(data.active_squad));
+        if (data.season_state) localStorage.setItem('season_state', JSON.stringify(data.season_state));
+      }
+    } catch (err) {
+      console.error("Error fetching user profile:", err);
+    }
+  };
+
+  // Sync Bankroll up to Supabase when it changes
+  useEffect(() => {
+    if (user) {
+      const timer = setTimeout(() => {
+        supabase.from('profiles').update({ bankroll: aiCoins }).eq('id', user.id).then();
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+    // Also save to localStorage as fallback
+    localStorage.setItem('aiCoins', aiCoins.toString());
+  }, [aiCoins, user]);
+
+  // Expose a generic sync function for other components (like UT, Season) to push JSON state
+  const syncGameState = async (columnName, jsonState) => {
+    if (user) {
+      const updateObj = {};
+      updateObj[columnName] = jsonState;
+      await supabase.from('profiles').update(updateObj).eq('id', user.id);
+    }
+  };
+
+  // Initialize UI settings from localStorage
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme');
     if (savedTheme) setTheme(savedTheme);
-    
-    const savedCoins = localStorage.getItem('aiCoins');
-    if (savedCoins) setAiCoins(parseInt(savedCoins));
 
     const savedSound = localStorage.getItem('soundEnabled');
     if (savedSound !== null) setSoundEnabled(savedSound === 'true');
 
     const savedLanguage = localStorage.getItem('language');
     if (savedLanguage) setLanguage(savedLanguage);
+
+    // Initial fallback for AI coins if not logged in
+    if (!user) {
+      const savedCoins = localStorage.getItem('aiCoins');
+      if (savedCoins) setAiCoins(parseInt(savedCoins));
+    }
 
     // Daily Login Check
     const lastLogin = localStorage.getItem('lastLoginDate');
@@ -47,7 +122,7 @@ export function AppProvider({ children }) {
       setLoginStreak(newStreak);
       setShowDailyRewardModal(true);
     }
-  }, []);
+  }, [user]);
 
   // Update theme class on body
   useEffect(() => {
@@ -115,6 +190,7 @@ export function AppProvider({ children }) {
 
   return (
     <AppContext.Provider value={{
+      user, isLoadingAuth, syncGameState,
       theme, toggleTheme,
       aiCoins, addCoins, deductCoins,
       soundEnabled, toggleSound, playSound,

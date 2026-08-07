@@ -11,6 +11,7 @@ export default function LoginPage() {
   const [tab, setTab] = useState("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [username, setUsername] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [phone, setPhone] = useState("");
@@ -62,7 +63,7 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
 
-    if (!email || !password || !firstName || !lastName || !phone || !dob) {
+    if (!email || !password || !firstName || !lastName || !phone || !dob || !username) {
       setError("Please fill in all required fields.");
       setLoading(false);
       return;
@@ -73,6 +74,7 @@ export default function LoginPage() {
       password,
       options: {
         data: {
+          username: username,
           first_name: firstName,
           last_name: lastName,
           phone: phone,
@@ -86,6 +88,15 @@ export default function LoginPage() {
       setError(signUpError.message);
       setLoading(false);
       return;
+    }
+
+    if (data.user) {
+      const { error: profileError } = await supabase.from('profiles').insert([
+        { id: data.user.id, username: username }
+      ]);
+      if (profileError && profileError.code !== '23505') {
+        console.error("Profile creation error:", profileError);
+      }
     }
 
     setSuccess("Sign up successful! Please check your email to confirm your account.");
@@ -193,9 +204,20 @@ export default function LoginPage() {
           {/* Sign Up Form */}
           {tab === "signup" && (
             <form onSubmit={handleSignup} className="space-y-4 animate-fade-in">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm text-[var(--text-secondary)] mb-1.5">First Name</label>
+                  <div>
+                    <label className="block text-sm font-bold text-gray-400 mb-1">Username</label>
+                    <input 
+                      type="text" 
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      placeholder="e.g. MessiFan10"
+                      className="w-full bg-gray-900/50 border border-gray-700 rounded-lg px-4 py-2 focus:border-green-500 focus:outline-none"
+                    />
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-bold text-gray-400 mb-1">First Name</label>
                   <input
                     type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)}
                     className="input-field" placeholder="John"
