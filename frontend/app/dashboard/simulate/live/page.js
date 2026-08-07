@@ -1,8 +1,9 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useAppContext } from "@/app/context/AppContext";
 import Pitch3D from "../components/Pitch3D";
+import { generateCommentary, generateAmbientCommentary, generateAtmosphere, getScoreContext } from "@/lib/commentaryEngine";
 
 export default function LiveBettingPage() {
   const [match, setMatch] = useState(null);
@@ -21,6 +22,11 @@ export default function LiveBettingPage() {
   // 3D Pitch State
   const [show3D, setShow3D] = useState(true);
   const [ballPos, setBallPos] = useState({ x: 50, y: 50 });
+  
+  // AI Commentary State
+  const [commentary, setCommentary] = useState([]);
+  const [showCommentary, setShowCommentary] = useState(true);
+  const commentaryRef = useRef(null);
 
   const { deductCoins, playSound } = useAppContext();
 
@@ -61,9 +67,18 @@ export default function LiveBettingPage() {
   useEffect(() => {
     if (isLive && match && minute > 0 && minute <= 90) {
       const currentEvents = match.events.filter(e => e.minute === minute);
+      const homeName = match.home.name;
+      const awayName = match.away.name;
       
       currentEvents.forEach(e => {
         setEvents(prev => [{ minute, ...e }, ...prev].slice(0, 10));
+        
+        // Generate AI Commentary for event
+        const comm = generateCommentary(e, homeName, awayName, homeScore, awayScore);
+        if (comm) {
+          setCommentary(prev => [comm, ...prev].slice(0, 30));
+        }
+        
         if (e.type === "goal") {
           playSound("whistle");
           if (e.team === "home") setHomeScore(s => s + 1);
@@ -90,20 +105,30 @@ export default function LiveBettingPage() {
         } else if (e.type === "corner" || e.type === "foul") {
            setBallPos({ x: e.x || (e.team === "home" ? 90 : 10), y: e.y || 50 });
         } else {
-           // Random action movement
            setBallPos({ x: 20 + Math.random() * 60, y: 20 + Math.random() * 60 });
         }
       });
       
-      // If no events this minute, slowly move ball back to center or wander
-      if (currentEvents.length === 0 && Math.random() > 0.5) {
-         setBallPos({ x: 30 + Math.random() * 40, y: 30 + Math.random() * 40 });
+      // Generate ambient commentary every ~3 minutes when there are no events
+      if (currentEvents.length === 0) {
+        setBallPos({ x: 30 + Math.random() * 40, y: 30 + Math.random() * 40 });
+        if (minute % 3 === 0 && Math.random() > 0.4) {
+          const ambient = generateAmbientCommentary(minute, homeName, awayName);
+          setCommentary(prev => [ambient, ...prev].slice(0, 30));
+        }
+      }
+      
+      // Generate atmospheric commentary at key moments
+      if ([1, 5, 15, 30, 45, 46, 50, 60, 75, 80, 85, 89].includes(minute)) {
+        const atm = generateAtmosphere(minute);
+        if (atm) {
+          setCommentary(prev => [atm, ...prev].slice(0, 30));
+        }
       }
       
       // Dynamically shift odds based on time remaining and score
       if (minute % 5 === 0 && !betSettled) {
         const timeRemaining = 90 - minute;
-        // As time runs out, 'none' odds plummet, 'home/away' odds skyrocket
         const noneOdds = Math.max(1.05, 1.05 + (timeRemaining / 90));
         const homeOdds = Math.min(20.0, 2.0 + (90 / timeRemaining));
         const awayOdds = Math.min(20.0, 2.5 + (90 / timeRemaining));
@@ -173,6 +198,12 @@ export default function LiveBettingPage() {
           </p>
         </div>
         <div className="flex gap-4 items-center">
+          <button 
+            onClick={() => setShowCommentary(!showCommentary)} 
+            className={`px-4 py-2 border rounded-lg font-bold text-sm transition-colors ${showCommentary ? 'border-[var(--accent-primary)] bg-[var(--accent-primary)]/10 text-[var(--accent-primary)]' : 'border-[var(--border-color)] hover:bg-white/5'}`}
+          >
+            🎙️ Commentary {showCommentary ? 'ON' : 'OFF'}
+          </button>
           <button 
             onClick={() => setShow3D(!show3D)} 
             className="px-4 py-2 border border-[var(--border-color)] rounded-lg font-bold text-sm hover:bg-white/5 transition-colors"
@@ -264,9 +295,60 @@ export default function LiveBettingPage() {
           )}
         </div>
 
-        {/* Live Event Feed */}
-        <div className="lg:col-span-3 glass-card p-6 min-h-[200px]">
-          <h3 className="font-bold text-lg mb-4">Live Match Feed</h3>
+        {/* AI Virtual Commentary */}
+        {showCommentary && (
+          <div className="lg:col-span-3 glass-card p-6 min-h-[250px] max-h-[400px] overflow-hidden relative border-t-4 border-[var(--accent-primary)]">
+            <div className="flex justify-between items-center mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-full bg-[var(--accent-primary)]/20 flex items-center justify-center border border-[var(--accent-primary)]">
+                  <span className="text-lg">🎙️</span>
+                </div>
+                <h3 className="font-black text-lg">AI Virtual Commentary</h3>
+                {isLive && <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>}
+              </div>
+              {match && minute > 0 && (
+                <div className="text-sm text-[var(--text-secondary)] font-bold">
+                  {getScoreContext(homeScore, awayScore, match.home.name, match.away.name)}
+                </div>
+              )}
+            </div>
+            <div ref={commentaryRef} className="space-y-2 overflow-y-auto max-h-[300px] pr-2 scrollbar-thin">
+              {commentary.length === 0 ? (
+                <div className="text-gray-500 italic flex items-center gap-2">
+                  <span className="animate-pulse">🎙️</span> The commentators are warming up... Press KICK OFF to begin.
+                </div>
+              ) : (
+                commentary.map((c, idx) => (
+                  <div 
+                    key={idx} 
+                    className={`p-3 rounded-lg transition-all duration-500 ${
+                      idx === 0 ? 'animate-fade-in' : 'opacity-80'
+                    } ${
+                      c.importance === 'critical' 
+                        ? 'bg-gradient-to-r from-[var(--accent-primary)]/20 to-transparent border-l-4 border-[var(--accent-primary)] font-bold text-white' 
+                        : c.importance === 'medium'
+                        ? 'bg-white/5 border-l-4 border-yellow-500/50 font-semibold'
+                        : 'bg-transparent border-l-4 border-gray-700 text-[var(--text-secondary)]'
+                    }`}
+                  >
+                    <span className={`${
+                      c.type === 'goal' ? 'text-green-400' :
+                      c.type === 'red_card' ? 'text-red-400' :
+                      c.type === 'yellow_card' ? 'text-yellow-400' :
+                      c.type === 'atmosphere' ? 'text-blue-400 italic' :
+                      ''
+                    }`}>{c.text}</span>
+                  </div>
+                ))
+              )}
+            </div>
+            <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-[var(--bg-primary)] to-transparent pointer-events-none"></div>
+          </div>
+        )}
+
+        {/* Classic Event Feed (always visible) */}
+        <div className="lg:col-span-3 glass-card p-6 min-h-[150px]">
+          <h3 className="font-bold text-lg mb-4">📋 Match Events</h3>
           <div className="space-y-2">
             {events.length === 0 ? (
               <div className="text-gray-500 italic">Waiting for kickoff...</div>
@@ -275,11 +357,11 @@ export default function LiveBettingPage() {
                 <div key={idx} className="flex gap-4 items-center p-2 border-b border-gray-800/50">
                   <div className="font-bold text-red-400 w-12">{e.minute}'</div>
                   <div className="text-xl">
-                    {e.type === "goal" ? "⚽" : e.type === "yellow_card" ? "🟨" : e.type === "red_card" ? "🟥" : "⏱️"}
+                    {e.type === "goal" ? "⚽" : e.type === "yellow_card" ? "🟨" : e.type === "red_card" ? "🟥" : e.type === "corner" ? "🚩" : e.type === "foul" ? "⚠️" : "⏱️"}
                   </div>
                   <div>
                     <span className="font-bold">{e.team ? e.team.toUpperCase() : "EVENT"}: </span>
-                    {e.type === "goal" ? "GOAL SCORED!" : e.type === "yellow_card" ? "Yellow card issued." : e.type === "red_card" ? "Player sent off!" : "Play continues..."}
+                    {e.type === "goal" ? `GOAL! ${e.player || ''}` : e.type === "yellow_card" ? "Yellow card issued." : e.type === "red_card" ? "Player sent off!" : e.type === "corner" ? "Corner kick." : e.type === "foul" ? "Foul committed." : "Play continues..."}
                   </div>
                 </div>
               ))
