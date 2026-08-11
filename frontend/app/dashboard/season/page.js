@@ -71,6 +71,11 @@ export default function SeasonHubPage() {
               </button>
             </div>
           ))}
+          <Link href="/dashboard/season/stats" className="glass-card flex flex-col items-center p-8 border-t-4 border-transparent hover:border-amber-500 transition-all bg-gradient-to-b from-transparent to-amber-900/10">
+            <div className="text-5xl mb-4">🏆</div>
+            <h2 className="text-2xl font-bold mb-2">Player Stats & Hall of Fame</h2>
+            <p className="text-[var(--text-secondary)] mb-6 text-center text-sm">Track the golden boot race and discover the ultimate legends of the virtual game.</p>
+          </Link>
         </div>
       </div>
     );
@@ -85,16 +90,21 @@ export default function SeasonHubPage() {
 
   return (
     <div className="max-w-6xl mx-auto animate-fade-in pt-6">
-      <div className="flex justify-between items-center mb-8">
+      <div className="flex justify-between items-center mb-8 border-b border-[var(--border-color)] pb-4">
         <div>
           <h1 className="text-3xl font-black mb-1">
             🏆 {league.name} <span className="text-[var(--accent-primary)]">Gameweek {seasonState.currentWeek}</span>
           </h1>
           <p className="text-[var(--text-secondary)]">Simulate the season and place weekly bets.</p>
         </div>
-        <button onClick={handleResetSeason} className="btn-secondary px-4 py-2 text-sm text-red-400 hover:text-red-300">
-          Abandon Season
-        </button>
+        <div className="flex gap-4">
+          <Link href="/dashboard/season/stats" className="btn-secondary px-4 py-2 text-sm flex items-center gap-2">
+            <span>🏆</span> Player Stats & Hall of Fame
+          </Link>
+          <button onClick={handleResetSeason} className="btn-secondary px-4 py-2 text-sm text-red-400 hover:text-red-300">
+            Abandon Season
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
