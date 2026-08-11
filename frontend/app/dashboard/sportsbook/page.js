@@ -199,9 +199,19 @@ function SportsbookPage() {
       {/* Main Content */}
       <div className="flex-1 min-w-0">
         
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-black mb-2 uppercase tracking-tight">Virtual Hub</h1>
-          <p className="text-[var(--text-secondary)]">Advanced neural networks predict match outcomes. Build your slip and beat the house.</p>
+        <div className="flex justify-between items-end mb-8 border-b border-[var(--border-color)] pb-4 mt-8">
+          <div>
+            <h1 className="text-4xl font-black mb-2 uppercase tracking-tight">Sportsbook</h1>
+            <p className="text-[var(--text-secondary)]">Live odds, bet builder, and instant settlement.</p>
+          </div>
+          <div className="flex gap-4">
+            <Link href="/dashboard/sportsbook/predictor" className="btn-secondary flex items-center gap-2">
+              <span>🏆</span> Weekly Predictor
+            </Link>
+            <button onClick={() => setShowBankModal(true)} className="btn-primary">
+              Deposit Funds 🏦
+            </button>
+          </div>
         </div>
 
         <VirtualTabs />

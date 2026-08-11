@@ -16,38 +16,6 @@ export default function BettingAnalyticsPage() {
     setLoading(false);
   }, []);
 
-  const generateMockData = () => {
-    const mockBets = [];
-    const markets = ["1", "X", "2", "O2.5", "U2.5", "BTTS_Y", "BTTS_N"];
-    let currentBankroll = 1000;
-    
-    for (let i = 0; i < 50; i++) {
-      const isWin = Math.random() > 0.5;
-      const isCashout = !isWin && Math.random() > 0.8;
-      const status = isWin ? "WON" : isCashout ? "CASHOUT" : "LOST";
-      
-      const wager = Math.floor(Math.random() * 50) + 10;
-      const odds = (Math.random() * 3 + 1.5).toFixed(2);
-      const potentialWin = (wager * odds).toFixed(2);
-      
-      const market = markets[Math.floor(Math.random() * markets.length)];
-      
-      mockBets.push({
-        status,
-        wager,
-        potentialWin: status === "CASHOUT" ? (wager * 1.2).toFixed(2) : potentialWin,
-        slip: [
-          { home: "Team A", away: "Team B", market, odds }
-        ]
-      });
-    }
-    
-    localStorage.setItem("settled_bets", JSON.stringify(mockBets));
-    setSettledBets(mockBets);
-    
-    // Dispatch bankroll update if we want to simulate having that money, but it's just history mock
-  };
-
   // KPIs
   const totalBets = settledBets.length;
   const totalWagered = settledBets.reduce((acc, bet) => acc + parseFloat(bet.wager), 0);
@@ -134,9 +102,7 @@ export default function BettingAnalyticsPage() {
           </h1>
         </div>
         <div>
-          <button onClick={generateMockData} className="btn-secondary text-sm">
-            Generate 50 Mock Bets (Testing)
-          </button>
+          {/* Mock data generator removed per user request */}
         </div>
       </div>
 
