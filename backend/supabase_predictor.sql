@@ -33,7 +33,6 @@ SELECT
   pe.week_id,
   pe.user_id,
   p.username,
-  p.avatar_url,
   pe.points,
   pe.created_at
 FROM public.predictor_entries pe

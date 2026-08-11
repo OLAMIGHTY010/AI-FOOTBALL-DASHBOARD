@@ -300,13 +300,9 @@ export default function PredictorPage() {
                       {idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : idx + 1}
                     </div>
                     <div className="col-span-7 flex items-center gap-2 truncate">
-                      {entry.avatar_url ? (
-                        <img src={entry.avatar_url} className="w-6 h-6 rounded-full border border-gray-600" alt="" />
-                      ) : (
-                        <div className="w-6 h-6 rounded-full bg-gray-700 flex items-center justify-center text-xs">
-                          👤
-                        </div>
-                      )}
+                      <div className="w-6 h-6 rounded-full bg-gray-700 flex items-center justify-center text-xs">
+                        👤
+                      </div>
                       <span className={`font-bold truncate ${entry.user_id === session?.user?.id ? 'text-[var(--accent-primary)]' : ''}`}>
                         {entry.username || 'Anonymous'}
                       </span>
