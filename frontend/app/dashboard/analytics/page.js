@@ -23,6 +23,13 @@ const ANALYTICS_SECTIONS = [
     href: "/dashboard/analytics/form",
     gradient: "from-green-500 to-emerald-500",
   },
+  {
+    icon: "🎰",
+    title: "Betting History Analytics",
+    desc: "Visualize your virtual sports betting performance. Track ROI, most profitable markets, and win/loss ratio.",
+    href: "/dashboard/analytics/betting",
+    gradient: "from-yellow-400 to-orange-500",
+  },
 ];
 
 export default function AnalyticsPage() {
