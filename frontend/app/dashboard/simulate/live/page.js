@@ -255,7 +255,7 @@ export default function LiveBettingPage() {
           
           
           {/* Progress Bar */}
-          <div className="w-full bg-gray-800 h-2 rounded-full mt-6 overflow-hidden mb-6">
+          <div className="w-full bg-[var(--bg-secondary)] border border-[var(--border-color)] h-3 rounded-full mt-6 overflow-hidden mb-6">
             <div 
               className="bg-red-500 h-full transition-all duration-500"
               style={{ width: `${(minute / 90) * 100}%` }}
@@ -339,10 +339,10 @@ export default function LiveBettingPage() {
                       idx === 0 ? 'animate-fade-in' : 'opacity-80'
                     } ${
                       c.importance === 'critical' 
-                        ? 'bg-gradient-to-r from-[var(--accent-primary)]/20 to-transparent border-l-4 border-[var(--accent-primary)] font-bold text-white' 
+                        ? 'bg-gradient-to-r from-[var(--accent-primary)]/20 to-transparent border-l-4 border-[var(--accent-primary)] font-bold text-[var(--text-primary)]' 
                         : c.importance === 'medium'
-                        ? 'bg-white/5 border-l-4 border-yellow-500/50 font-semibold'
-                        : 'bg-transparent border-l-4 border-gray-700 text-[var(--text-secondary)]'
+                        ? 'bg-[var(--bg-secondary)] border-l-4 border-yellow-500/50 font-semibold'
+                        : 'bg-transparent border-l-4 border-[var(--border-color)] text-[var(--text-secondary)]'
                     }`}
                   >
                     <span className={`${
@@ -365,10 +365,10 @@ export default function LiveBettingPage() {
           <h3 className="font-bold text-lg mb-4">📋 Match Events</h3>
           <div className="space-y-2">
             {events.length === 0 ? (
-              <div className="text-gray-500 italic">Waiting for kickoff...</div>
+              <div className="text-[var(--text-secondary)] italic">Waiting for kickoff...</div>
             ) : (
               events.map((e, idx) => (
-                <div key={idx} className="flex gap-4 items-center p-2 border-b border-gray-800/50">
+                <div key={idx} className="flex gap-4 items-center p-2 border-b border-[var(--border-color)]">
                   <div className="font-bold text-red-400 w-12">{e.minute}'</div>
                   <div className="text-xl">
                     {e.type === "goal" ? "⚽" : e.type === "yellow_card" ? "🟨" : e.type === "red_card" ? "🟥" : e.type === "corner" ? "🚩" : e.type === "foul" ? "⚠️" : "⏱️"}

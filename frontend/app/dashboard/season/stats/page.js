@@ -222,38 +222,38 @@ export default function SeasonStatsPage() {
                   <div className={`absolute -inset-1 bg-gradient-to-r ${legend.color} rounded-2xl blur opacity-25 group-hover:opacity-75 transition duration-500`}></div>
                   
                   {/* Card Content */}
-                  <div className="relative h-full bg-black/80 backdrop-blur-xl border border-yellow-500/30 rounded-2xl p-6 flex flex-col items-center text-center overflow-hidden">
+                  <div className="relative h-full bg-[var(--bg-glass)] backdrop-blur-xl border border-yellow-500/30 rounded-2xl p-6 flex flex-col items-center text-center overflow-hidden">
                     
                     {/* Decorative pattern */}
                     <div className="absolute top-0 right-0 w-32 h-32 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10 rounded-tr-2xl"></div>
                     
                     {/* Placeholder for Player Image (Silhouette) */}
-                    <div className="w-32 h-32 rounded-full bg-gradient-to-br from-gray-800 to-black border-4 border-yellow-500/50 mb-4 flex items-center justify-center shadow-[0_0_30px_rgba(234,179,8,0.3)] relative z-10 overflow-hidden">
+                    <div className="w-32 h-32 rounded-full bg-[var(--bg-secondary)] border-4 border-yellow-500/50 mb-4 flex items-center justify-center shadow-[0_0_30px_rgba(234,179,8,0.3)] relative z-10 overflow-hidden">
                        <span className="text-5xl">👤</span>
                     </div>
 
-                    <h3 className="text-2xl font-black text-white mb-1 drop-shadow-lg">{legend.name}</h3>
+                    <h3 className="text-2xl font-black text-[var(--text-primary)] mb-1 drop-shadow-lg">{legend.name}</h3>
                     <div className={`text-xs font-bold uppercase tracking-widest text-transparent bg-clip-text bg-gradient-to-r ${legend.color} mb-4`}>
                       {legend.status}
                     </div>
 
-                    <p className="text-sm text-gray-400 mb-6 italic leading-relaxed flex-1">
+                    <p className="text-sm text-[var(--text-secondary)] mb-6 italic leading-relaxed flex-1">
                       "{legend.description}"
                     </p>
 
                     {/* Stats Grid */}
                     <div className="w-full grid grid-cols-3 gap-2 pt-4 border-t border-yellow-500/20">
                       <div className="flex flex-col items-center">
-                        <span className="text-2xl font-black text-white">{legend.stats.goals}</span>
-                        <span className="text-[10px] text-gray-500 uppercase font-bold">Goals</span>
+                        <span className="text-2xl font-black text-[var(--text-primary)]">{legend.stats.goals}</span>
+                        <span className="text-[10px] text-[var(--text-secondary)] uppercase font-bold">Goals</span>
                       </div>
                       <div className="flex flex-col items-center border-l border-r border-yellow-500/20">
-                        <span className="text-2xl font-black text-white">{legend.stats.assists}</span>
-                        <span className="text-[10px] text-gray-500 uppercase font-bold">Assists</span>
+                        <span className="text-2xl font-black text-[var(--text-primary)]">{legend.stats.assists}</span>
+                        <span className="text-[10px] text-[var(--text-secondary)] uppercase font-bold">Assists</span>
                       </div>
                       <div className="flex flex-col items-center">
-                        <span className="text-2xl font-black text-white">{legend.stats.matches}</span>
-                        <span className="text-[10px] text-gray-500 uppercase font-bold">Matches</span>
+                        <span className="text-2xl font-black text-[var(--text-primary)]">{legend.stats.matches}</span>
+                        <span className="text-[10px] text-[var(--text-secondary)] uppercase font-bold">Matches</span>
                       </div>
                     </div>
 

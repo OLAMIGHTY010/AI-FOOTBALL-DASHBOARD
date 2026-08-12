@@ -174,14 +174,14 @@ export default function ProfilePage() {
 
         {/* Avatar */}
         <div className="relative">
-          <div className="w-32 h-32 rounded-full border-4 border-gray-700 bg-gray-800 flex justify-center items-center overflow-hidden z-10 shadow-2xl">
+          <div className="w-32 h-32 rounded-full border-4 border-[var(--border-color)] bg-[var(--bg-secondary)] flex justify-center items-center overflow-hidden z-10 shadow-2xl">
             {profile.avatar_url ? (
               <img src={profile.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
             ) : (
               <span className="text-6xl">👤</span>
             )}
           </div>
-          <div className="absolute -bottom-2 -right-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white font-black text-xl rounded-full w-12 h-12 flex items-center justify-center border-4 border-[#121212] z-20 shadow-lg">
+          <div className="absolute -bottom-2 -right-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white font-black text-xl rounded-full w-12 h-12 flex items-center justify-center border-4 border-[var(--bg-primary)] z-20 shadow-lg">
             {profile.level}
           </div>
         </div>
@@ -200,7 +200,7 @@ export default function ProfilePage() {
               <span className="text-blue-400">XP: {profile.xp}</span>
               <span className="text-[var(--text-secondary)]">Next Level: {xpForNext} XP</span>
             </div>
-            <div className="w-full h-4 bg-gray-800 rounded-full overflow-hidden border border-gray-700 shadow-inner">
+            <div className="w-full h-4 bg-[var(--bg-secondary)] rounded-full overflow-hidden border border-[var(--border-color)] shadow-inner">
               <div 
                 className="h-full bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 transition-all duration-1000 ease-out relative"
                 style={{ width: `${progressPercent}%` }}
@@ -227,18 +227,18 @@ export default function ProfilePage() {
                   key={badge.id} 
                   className={`relative p-4 rounded-xl border flex gap-4 transition-all ${
                     unlocked 
-                      ? 'bg-gradient-to-br from-gray-800 to-gray-900 border-yellow-500/50 shadow-[0_0_15px_rgba(234,179,8,0.1)] hover:scale-[1.02]' 
-                      : 'bg-black/40 border-gray-800 opacity-60 grayscale hover:grayscale-0 hover:opacity-100'
+                      ? 'bg-[var(--bg-secondary)] border-yellow-500/50 shadow-[0_0_15px_rgba(234,179,8,0.1)] hover:scale-[1.02]' 
+                      : 'bg-[var(--bg-primary)] border-[var(--border-color)] opacity-60 grayscale hover:grayscale-0 hover:opacity-100'
                   }`}
                 >
-                  <div className={`w-16 h-16 rounded-full flex justify-center items-center text-3xl border-2 flex-shrink-0 ${unlocked ? 'bg-yellow-500/20 border-yellow-500 shadow-[0_0_20px_rgba(234,179,8,0.4)]' : 'bg-gray-800 border-gray-600'}`}>
+                  <div className={`w-16 h-16 rounded-full flex justify-center items-center text-3xl border-2 flex-shrink-0 ${unlocked ? 'bg-yellow-500/20 border-yellow-500 shadow-[0_0_20px_rgba(234,179,8,0.4)]' : 'bg-[var(--bg-secondary)] border-[var(--border-color)]'}`}>
                     {badge.icon}
                   </div>
                   <div>
-                    <h3 className={`font-black text-lg ${unlocked ? 'text-white drop-shadow-md' : 'text-gray-400'}`}>
+                    <h3 className={`font-black text-lg ${unlocked ? 'text-[var(--text-primary)] drop-shadow-md' : 'text-[var(--text-secondary)]'}`}>
                       {badge.name}
                     </h3>
-                    <p className="text-xs text-gray-400 leading-relaxed mb-1">{badge.desc}</p>
+                    <p className="text-xs text-[var(--text-secondary)] leading-relaxed mb-1">{badge.desc}</p>
                     <div className="text-xs font-bold text-blue-400">+{badge.xp} XP</div>
                   </div>
                   {unlocked && (
