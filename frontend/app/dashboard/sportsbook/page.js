@@ -3,6 +3,7 @@ import { useSearchParams } from "next/navigation";
 import { Suspense, useState, useEffect } from "react";
 import VirtualTabs from "../components/VirtualTabs";
 import { supabase } from "@/lib/supabaseClient";
+import { useAppContext } from "@/app/context/AppContext";
 import { MARKET_LABELS, getMarketLabel } from "@/lib/utils";
 
 const API_URL = "http://localhost:8000";
@@ -17,6 +18,7 @@ export default function SportsbookPageWrapper() {
 
 function SportsbookPage() {
   const searchParams = useSearchParams();
+  const { addToast } = useAppContext();
   const currentSport = searchParams.get("sport") || "football";
   const apiEndpoint = currentSport === "basketball" ? `${API_URL}/api/fixtures/basketball` : currentSport === "tennis" ? `${API_URL}/api/fixtures/tennis` : currentSport === "racing" ? `${API_URL}/api/fixtures/racing` : `${API_URL}/api/fixtures`;
 
@@ -35,10 +37,23 @@ function SportsbookPage() {
 
   useEffect(() => {
     fetchFixtures();
-    setPendingBets(JSON.parse(localStorage.getItem("pending_bets") || "[]"));
-    setSettledBets(JSON.parse(localStorage.getItem("settled_bets") || "[]"));
+    fetchBetHistory();
     fetchLeaderboard();
   }, []);
+
+  const fetchBetHistory = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session) {
+      try {
+        const res = await fetch(`${API_URL}/api/bet/history?user_id=${session.user.id}`);
+        const data = await res.json();
+        setPendingBets(data.pending || []);
+        setSettledBets(data.settled || []);
+      } catch (e) {
+        console.error("Failed to fetch bet history", e);
+      }
+    }
+  };
 
   const fetchLeaderboard = async () => {
     try {
@@ -103,7 +118,7 @@ function SportsbookPage() {
           mutuallyExclusive[market] && mutuallyExclusive[market].includes(b.market)
         );
         if (hasConflict) {
-          alert("You cannot combine mutually exclusive markets in a Bet Builder!");
+          addToast("Bet Builder Error", "You cannot combine mutually exclusive markets!", "error");
           return prevSlip;
         }
         return [...prevSlip, { fixtureId: fixture.id, home: fixture.home?.name || fixture.name, away: fixture.away?.name || null, market, odds }];
@@ -127,48 +142,34 @@ function SportsbookPage() {
       if (bankroll === 0) {
         setShowBankModal(true);
       } else {
-        alert("Insufficient funds! Lower your wager or go bankrupt to visit the virtual bank.");
+        addToast("Insufficient Funds", "Lower your wager or go bankrupt to visit the virtual bank.", "error");
       }
       return;
     }
+    const newBankroll = bankroll - wager;
+    localStorage.setItem("bankroll", newBankroll.toString());
+    window.dispatchEvent(new Event("storage"));
     
-    // API Call for Phase 3 Parlay
-    if (betSlip.length > 1) {
-      try {
-        await fetch(`${API_URL}/api/bet/parlay`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ legs: betSlip, wager: parseFloat(wager) })
-        });
-      } catch (e) {
-        console.error("Failed to register parlay on backend", e);
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session) {
+      // The backend API will now handle the Supabase wallet deduction.
+      // API Call for Phase 4 Bets
+      if (betSlip.length > 0) {
+        try {
+          await fetch(`${API_URL}/api/bet/parlay`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ legs: betSlip, wager: parseFloat(wager), user_id: session.user.id })
+          });
+          fetchBetHistory(); // Refresh bets
+        } catch (e) {
+          console.error("Failed to register parlay on backend", e);
+        }
       }
     }
     
-    const newBankroll = bankroll - wager;
-    localStorage.setItem("bankroll", newBankroll.toString());
-    
-    // Dispatch event to update navbar instantly
-    window.dispatchEvent(new Event("storage"));
-    
-    // Update Supabase wallet
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session) {
-      await supabase
-        .from("wallets")
-        .update({ balance: newBankroll })
-        .eq("user_id", session.user.id);
-    }
-
-    // Store pending bets
-    const pending = JSON.parse(localStorage.getItem("pending_bets") || "[]");
-    const newBet = { slip: betSlip, wager, totalOdds, potentialWin, timestamp: Date.now() };
-    pending.push(newBet);
-    localStorage.setItem("pending_bets", JSON.stringify(pending));
-    setPendingBets(pending); // update local state
-    
     setBetSlip([]);
-    alert(`Bet placed! Wager: $${wager} | Potential Win: $${potentialWin}`);
+    addToast("Bet Placed!", `Wager: $${wager} | Potential Win: $${potentialWin}`, "success");
   };
 
   const takeLoan = async () => {
@@ -188,7 +189,7 @@ function SportsbookPage() {
     }
     
     setShowBankModal(false);
-    alert("Loan approved! $500 added to your account. You now owe the bank $550.");
+    addToast("Loan Approved!", "$500 added to your account. You now owe the bank $550.", "success");
   };
 
   const filteredFixtures = selectedLeague === "All" || currentSport === "racing"
@@ -200,9 +201,19 @@ function SportsbookPage() {
       {/* Main Content */}
       <div className="flex-1 min-w-0">
         
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-black mb-2 uppercase tracking-tight">Virtual Hub</h1>
-          <p className="text-[var(--text-secondary)]">Advanced neural networks predict match outcomes. Build your slip and beat the house.</p>
+        <div className="flex justify-between items-end mb-8 border-b border-[var(--border-color)] pb-4 mt-8">
+          <div>
+            <h1 className="text-4xl font-black mb-2 uppercase tracking-tight">Sportsbook</h1>
+            <p className="text-[var(--text-secondary)]">Live odds, bet builder, and instant settlement.</p>
+          </div>
+          <div className="flex gap-4">
+            <Link href="/dashboard/sportsbook/predictor" className="btn-secondary flex items-center gap-2">
+              <span>🏆</span> Weekly Predictor
+            </Link>
+            <button onClick={() => setShowBankModal(true)} className="btn-primary">
+              Deposit Funds 🏦
+            </button>
+          </div>
         </div>
 
         <VirtualTabs />

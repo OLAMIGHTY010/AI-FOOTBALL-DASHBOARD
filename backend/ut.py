@@ -122,6 +122,24 @@ def pull_random_player(rarity: str) -> dict:
     player["id"] = f"{player['name'].lower().replace(' ', '_')}_{random.randint(1000, 9999)}"
     player["sell_value"] = get_sell_value(rarity)
     player["team"] = "Free Agent"
+    
+    # Generate 6 stats scaled around the player's overall rating
+    base = player["rating"]
+    def generate_stat(is_key: bool):
+        variance = 4 if is_key else 15
+        val = base + random.randint(-variance, variance)
+        return min(max(val, 20), 99)
+        
+    pos = player["position"]
+    player["stats"] = {
+        "PAC": generate_stat(pos in ["FWD", "MID"]),
+        "SHO": generate_stat(pos == "FWD"),
+        "PAS": generate_stat(pos == "MID"),
+        "DRI": generate_stat(pos in ["FWD", "MID"]),
+        "DEF": generate_stat(pos == "DEF"),
+        "PHY": generate_stat(pos in ["DEF", "MID"])
+    }
+    
     return player
 
 def open_pack(pack_name: str) -> list:

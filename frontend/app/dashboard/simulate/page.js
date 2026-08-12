@@ -3,10 +3,13 @@ import { useState, useEffect, useRef, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { getMarketLabel } from "@/lib/utils";
+import { useAppContext } from "@/app/context/AppContext";
 import VirtualTabs from "../components/VirtualTabs";
 import BasketballCourt from "./components/BasketballCourt";
 import TennisCourt from "./components/TennisCourt";
 import RaceTrack from "./components/RaceTrack";
+import BetSlip from "./components/BetSlip";
+import BetHistory from "./components/BetHistory";
 
 const API_URL = "http://localhost:8000";
 
@@ -92,9 +95,15 @@ function SimulatePage() {
   const [settledBets, setSettledBets] = useState([]);
   const [initialStandings, setInitialStandings] = useState(null);
   const [liveStandings, setLiveStandings] = useState({});
+  const { deductCoins, playSound } = useAppContext();
 
-  // 2D Viewer State
+  // Betting States
+  const [betSlip, setBetSlip] = useState([]);
+  const [stake, setStake] = useState(10);
+
+  // 2D Viewer & Highlights State
   const [featuredMatchId, setFeaturedMatchId] = useState(null);
+  const [activeHighlights, setActiveHighlights] = useState(null);
   const [ballPos, setBallPos] = useState({ x: 50, y: 50 });
   const [overlayMsg, setOverlayMsg] = useState(null);
   const [pitchPlayers, setPitchPlayers] = useState({ home: INITIAL_HOME_PLAYERS, away: INITIAL_AWAY_PLAYERS });
@@ -105,8 +114,7 @@ function SimulatePage() {
 
   const fetchStandings = async () => {
     try {
-      // We don't have separate standings for basketball yet in the backend, but we can reuse the same endpoint for now or skip.
-      const res = await fetch(`${API_URL}/api/standings`);
+      const res = await fetch(`${API_URL}/api/standings?sport=${currentSport}`);
       const data = await res.json();
       setInitialStandings(data);
       setLiveStandings(data);
@@ -115,12 +123,12 @@ function SimulatePage() {
     }
   };
 
-  // Load pending bets and initial standings on mount
+  // Load pending bets and initial standings on mount and when sport changes
   useEffect(() => {
     setPendingBets(JSON.parse(localStorage.getItem("pending_bets") || "[]"));
     setSettledBets(JSON.parse(localStorage.getItem("settled_bets") || "[]"));
     fetchStandings();
-  }, []);
+  }, [currentSport]);
 
   // Dynamic Player Movement Effect
   useEffect(() => {
@@ -209,12 +217,14 @@ function SimulatePage() {
       if (newEvents.length > 0) {
         setLiveEvents(prev => [...newEvents, ...prev].slice(0, 15));
       } else {
-        if (Math.random() < 0.2) {
+        if (Math.random() < 0.2 && results && results.length > 0) {
           const randomMatch = results[Math.floor(Math.random() * results.length)];
-          setLiveEvents(prev => [
-            { type: "commentary", minute: currentMinute, text: GENERATE_COMMENTARY(randomMatch.home.name, randomMatch.away.name, currentMinute), home: randomMatch.home.name, away: randomMatch.away.name },
-            ...prev
-          ].slice(0, 15));
+          if (randomMatch && randomMatch.home && randomMatch.away) {
+            setLiveEvents(prev => [
+              { type: "commentary", minute: currentMinute, text: GENERATE_COMMENTARY(randomMatch.home.name, randomMatch.away.name, currentMinute), home: randomMatch.home.name, away: randomMatch.away.name },
+              ...prev
+            ].slice(0, 15));
+          }
         }
       }
 
@@ -258,6 +268,7 @@ function SimulatePage() {
         const newStandings = JSON.parse(JSON.stringify(initialStandings)); 
         
         results.forEach(match => {
+          if (!match.home) return;
           const score = calculateLiveScore(match, currentMinute);
           const league = match.home.league;
           const h_name = match.home.name;
@@ -335,6 +346,12 @@ function SimulatePage() {
   };
 
   const runSimulation = async () => {
+    playSound('/sounds/click.wav');
+    if (!deductCoins(10)) {
+      alert("Not enough AI Coins to simulate!");
+      return;
+    }
+
     setLoading(true);
     try {
       const res = await fetch(apiEndpointSim, {
@@ -344,6 +361,11 @@ function SimulatePage() {
       });
       const data = await res.json();
       setResults(data.results);
+      
+      if (data.settled_bets && data.settled_bets.length > 0) {
+        // Backend settled our bets! Store them temporarily to show an alert later.
+        window.__recent_settled_bets = data.settled_bets;
+      }
       
       // Default to first match as featured
       if (data.results && data.results.length > 0) {
@@ -364,88 +386,50 @@ function SimulatePage() {
 
   const finishSimulation = async () => {
     setIsLive(false);
-    setCurrentMinute(currentSport === "basketball" ? 40 : 90);
-    
-    // Process pending bets now that match is officially over
-    if (!results) return;
-    
-    let currentBankroll = parseFloat(localStorage.getItem("bankroll") || "0");
+    const maxTime = currentSport === "basketball" ? 40 : 90;
+    setCurrentMinute(maxTime);
+
+    // Locally settle pending bets based on final results
     let totalWinnings = 0;
-    let newSettledBets = [...settledBets];
-
-    const updatedPending = pendingBets.filter(bet => {
+    const newSettled = [];
+    
+    pendingBets.forEach(bet => {
       let allWon = true;
-      let anyMatchFound = false;
-
       for (const leg of bet.slip) {
         const match = results.find(m => m.id === leg.fixtureId);
         if (match) {
-          anyMatchFound = true;
-          const h_g = match.h_goals;
-          const a_g = match.a_goals;
-          const market = leg.market;
-          let won = false;
-          if (market.startsWith("WIN_")) {
-            const runnerId = parseInt(market.split("_")[1]);
-            const winner = match.standings[0];
-            if (winner && winner.id === runnerId) won = true;
-          } else if (market.startsWith("PLC_")) {
-            const runnerId = parseInt(market.split("_")[1]);
-            const placed = match.standings.slice(0, 3).find(r => r.id === runnerId);
-            if (placed) won = true;
-          } else {
-            if (market === "1" && h_g > a_g) won = true;
-            else if (market === "X" && h_g === a_g) won = true;
-            else if (market === "2" && h_g < a_g) won = true;
-            else if (market === "O2.5" && h_g + a_g > 2.5) won = true;
-            else if (market === "U2.5" && h_g + a_g < 2.5) won = true;
-            else if (market === "BTTS_Y" && h_g > 0 && a_g > 0) won = true;
-            else if (market === "BTTS_N" && (h_g === 0 || a_g === 0)) won = true;
+          const score = calculateLiveScore(match, maxTime);
+          if (!evaluateMarket(leg.market, score, match, maxTime)) {
+            allWon = false;
+            break;
           }
-          
-          if (!won) allWon = false;
         }
       }
-      
-      if (anyMatchFound) {
-        if (allWon) {
-          totalWinnings += parseFloat(bet.potentialWin);
-          newSettledBets.push({ ...bet, status: "WON" });
-        } else {
-          newSettledBets.push({ ...bet, status: "LOST" });
-        }
-        return false; 
+
+      if (allWon) {
+        totalWinnings += parseFloat(bet.potentialWin);
+        newSettled.push({ ...bet, status: "WON" });
+      } else {
+        newSettled.push({ ...bet, status: "LOST" });
       }
-      return true; 
     });
 
-    if (totalWinnings > 0) {
-      currentBankroll += totalWinnings;
-      localStorage.setItem("bankroll", currentBankroll.toString());
+    if (newSettled.length > 0) {
+      setSettledBets([...settledBets, ...newSettled]);
+      setPendingBets([]);
       
-      // Dispatch event to update navbar instantly
-      window.dispatchEvent(new Event("storage"));
-      
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        await supabase
-          .from("wallets")
-          .update({ balance: currentBankroll })
-          .eq("user_id", session.user.id);
+      if (totalWinnings > 0) {
+        let currentBankroll = parseFloat(localStorage.getItem("bankroll") || "0");
+        currentBankroll += totalWinnings;
+        localStorage.setItem("bankroll", currentBankroll.toString());
+        window.dispatchEvent(new Event("bankrollUpdate"));
+        alert(`🎉 Full Time! Bets Settled! You won £${totalWinnings.toFixed(2)}!`);
+      } else {
+        alert("🏁 Full Time! Simulation Complete. All bets lost.");
       }
-      
-      alert(`🎉 Full Time! Bets Settled! You won $${totalWinnings.toFixed(2)}!`);
     } else {
       alert("🏁 Full Time! Simulation Complete.");
     }
-
-    localStorage.setItem("pending_bets", JSON.stringify(updatedPending));
-    setPendingBets(updatedPending);
-
-    // Keep only the last 20 settled bets to prevent bloat
-    const limitedSettledBets = newSettledBets.slice(-20);
-    localStorage.setItem("settled_bets", JSON.stringify(limitedSettledBets));
-    setSettledBets(limitedSettledBets);
   };
 
   const skipToEnd = () => {
@@ -534,30 +518,38 @@ function SimulatePage() {
 
   const handleCashOut = async (betIndex) => {
     const bet = pendingBets[betIndex];
-    if (!bet || !isLive) return;
+    if (!bet) return;
 
     const cashOutAmount = getCashOutValue(bet);
+    
+    // Call backend API for secure cashout
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session) {
+      try {
+        await fetch(`${API_URL}/api/bet/cashout`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ bet_id: bet.id, cash_out_amount: parseFloat(cashOutAmount), user_id: session.user.id })
+        });
+      } catch (e) {
+        console.error("Cashout failed", e);
+      }
+    }
+
     const bankroll = parseFloat(localStorage.getItem("bankroll") || "0");
     const newBankroll = bankroll + parseFloat(cashOutAmount);
     
     localStorage.setItem("bankroll", newBankroll.toString());
     window.dispatchEvent(new Event("storage"));
 
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session) {
-      await supabase.from("wallets").update({ balance: newBankroll }).eq("user_id", session.user.id);
-    }
-
     const updatedPending = [...pendingBets];
     updatedPending.splice(betIndex, 1);
     
-    const newSettled = [...settledBets, { ...bet, status: 'CASH OUT', potentialWin: cashOutAmount }];
+    const newSettled = [...settledBets, { ...bet, status: 'CASH OUT', potential_payout: cashOutAmount }];
     
-    localStorage.setItem("pending_bets", JSON.stringify(updatedPending));
     setPendingBets(updatedPending);
     
     const limitedSettledBets = newSettled.slice(-20);
-    localStorage.setItem("settled_bets", JSON.stringify(limitedSettledBets));
     setSettledBets(limitedSettledBets);
     
     alert(`Cashed out for $${cashOutAmount}!`);
@@ -592,6 +584,48 @@ function SimulatePage() {
     const safe_odds = (prob) => Math.max(parseFloat(((1 / Math.max(prob, 0.01)) * house_edge).toFixed(2)), 1.01).toFixed(2);
         
     return { "1": safe_odds(h_prob), "X": safe_odds(d_prob), "2": safe_odds(a_prob) };
+  };
+
+  const addToSlip = (match, market, odds) => {
+    const existing = betSlip.find(leg => leg.fixtureId === match.id);
+    if (existing) {
+      setBetSlip(betSlip.map(leg => leg.fixtureId === match.id ? { ...leg, market, odds } : leg));
+    } else {
+      setBetSlip([...betSlip, { fixtureId: match.id, home: match.home.name, away: match.away.name, market, odds }]);
+    }
+    playSound("click");
+  };
+
+  const placeSlipBet = async () => {
+    const bankroll = parseFloat(localStorage.getItem("bankroll") || "0");
+    if (stake > bankroll) {
+      alert("Insufficient funds!");
+      return;
+    }
+    const newBankroll = (bankroll - stake).toFixed(2);
+    localStorage.setItem("bankroll", newBankroll);
+    window.dispatchEvent(new Event("bankrollUpdate"));
+    deductCoins(stake);
+
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session) {
+      await supabase.from("wallets").update({ balance: newBankroll }).eq("user_id", session.user.id);
+    }
+
+    const totalOdds = betSlip.reduce((acc, leg) => acc * parseFloat(leg.odds), 1).toFixed(2);
+    const potentialWin = (stake * totalOdds).toFixed(2);
+    
+    const newBet = {
+      slip: betSlip,
+      wager: stake,
+      totalOdds,
+      potentialWin,
+      timestamp: Date.now()
+    };
+
+    setPendingBets([...pendingBets, newBet]);
+    setBetSlip([]);
+    playSound("coin");
   };
 
   const placeLiveBet = async (market, odds) => {
@@ -863,8 +897,9 @@ function SimulatePage() {
                       ${isLive && (score.h > 0 || score.a > 0) && !isFeatured ? 'border-yellow-500/50' : ''}
                     `}
                   >
-                    <div className="text-[10px] text-[var(--accent-primary)] mb-1 font-semibold truncate">
-                      {match.home.league}
+                    <div className="text-[10px] text-[var(--accent-primary)] mb-1 font-semibold truncate flex justify-between">
+                      <span>{match.home.league}</span>
+                      <span title={match.weather}>{match.weather === 'Rain' ? '🌧️' : match.weather === 'Snow' ? '❄️' : '☀️'}</span>
                     </div>
                     <div className="flex justify-between items-center">
                       <div className="flex-1 text-right font-bold text-sm truncate">{match.home.name}</div>
@@ -873,6 +908,34 @@ function SimulatePage() {
                       </div>
                       <div className="flex-1 text-left font-bold text-sm truncate">{match.away.name}</div>
                     </div>
+                    {!isLive && currentMinute >= 90 && match.highlights && (
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); setActiveHighlights(match.highlights); }}
+                        className="w-full mt-2 text-[10px] bg-[var(--bg-primary)] border border-[var(--border-color)] hover:border-[var(--accent-primary)] rounded py-1 transition-colors"
+                      >
+                        View Highlights 🎬
+                      </button>
+                    )}
+                    {!isLive && currentMinute === 0 && (
+                      <div className="mt-2 grid grid-cols-3 gap-1">
+                        {(() => {
+                          const odds = calculateLiveOdds(match.home.power, match.away.power, 0, 0, 0);
+                          return (
+                            <>
+                              <button onClick={(e) => { e.stopPropagation(); addToSlip(match, "1", odds["1"]); }} className="text-[10px] bg-[var(--bg-primary)] border border-[var(--border-color)] hover:border-[var(--accent-primary)] rounded py-1">
+                                {odds["1"]}
+                              </button>
+                              <button onClick={(e) => { e.stopPropagation(); addToSlip(match, "X", odds["X"]); }} className="text-[10px] bg-[var(--bg-primary)] border border-[var(--border-color)] hover:border-[var(--accent-primary)] rounded py-1">
+                                {odds["X"]}
+                              </button>
+                              <button onClick={(e) => { e.stopPropagation(); addToSlip(match, "2", odds["2"]); }} className="text-[10px] bg-[var(--bg-primary)] border border-[var(--border-color)] hover:border-[var(--accent-primary)] rounded py-1">
+                                {odds["2"]}
+                              </button>
+                            </>
+                          )
+                        })()}
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -896,20 +959,25 @@ function SimulatePage() {
                     <thead className="bg-black/20 text-[var(--text-secondary)]">
                       <tr>
                         <th className="px-2 py-1 w-6 text-center">#</th>
-                        <th className="px-2 py-1">Club</th>
+                        <th className="px-2 py-1">{currentSport === 'tennis' ? 'Player' : currentSport === 'racing' ? 'Runner' : 'Club'}</th>
                         <th className="px-2 py-1 text-center w-8">PL</th>
-                        <th className="px-2 py-1 text-center w-8">GD</th>
+                        <th className="px-2 py-1 text-center w-8">{currentSport === 'basketball' ? 'PD' : currentSport === 'tennis' ? 'Sets' : currentSport === 'racing' ? 'W' : 'GD'}</th>
                         <th className="px-2 py-1 text-center w-8 font-bold text-white">Pts</th>
                       </tr>
                     </thead>
                     <tbody>
                       {Object.entries(teams).slice(0, 5).map(([team, stats], index) => {
+                        let secondaryStat = stats.GD;
+                        if (currentSport === 'basketball') secondaryStat = stats.PD;
+                        else if (currentSport === 'tennis') secondaryStat = `${stats.SetsW}-${stats.SetsL}`;
+                        else if (currentSport === 'racing') secondaryStat = stats.W;
+
                         return (
                           <tr key={team} className="border-b border-[var(--border-color)]/50 last:border-0 hover:bg-white/5 transition-colors">
                             <td className="px-2 py-1.5 text-center text-[var(--text-secondary)]">{index + 1}</td>
                             <td className="px-2 py-1.5 font-bold truncate max-w-[100px]">{team}</td>
                             <td className="px-2 py-1.5 text-center">{stats.P}</td>
-                            <td className="px-2 py-1.5 text-center">{stats.GD > 0 ? `+${stats.GD}` : stats.GD}</td>
+                            <td className="px-2 py-1.5 text-center">{currentSport === 'football' || currentSport === 'basketball' ? (secondaryStat > 0 ? `+${secondaryStat}` : secondaryStat) : secondaryStat}</td>
                             <td className="px-2 py-1.5 text-center font-bold text-[var(--accent-primary)]">{stats.Pts}</td>
                           </tr>
                         );
@@ -928,6 +996,18 @@ function SimulatePage() {
 
       {/* Sidebar (Commentary & Bets) */}
       <div className="w-full xl:w-80 space-y-6 flex-shrink-0">
+
+        {/* Bet Slip (Pre-match) */}
+        {!isLive && currentMinute === 0 && (
+          <BetSlip 
+            betSlip={betSlip} 
+            setBetSlip={setBetSlip} 
+            stake={stake} 
+            setStake={setStake} 
+            placeBet={placeSlipBet}
+            bankroll={parseFloat(typeof window !== "undefined" ? localStorage.getItem("bankroll") || "0" : "0")}
+          />
+        )}
         
         {/* Pending Bets */}
         <div className="glass-card !p-4">
@@ -967,30 +1047,9 @@ function SimulatePage() {
           )}
         </div>
 
-        {/* Settled Bets */}
-        {settledBets.length > 0 && (
-          <div className="glass-card !p-4">
-            <h3 className="font-bold mb-3 border-b border-[var(--border-color)] pb-2">📜 Settled Bets</h3>
-            <div className="space-y-3 max-h-[300px] overflow-y-auto">
-              {[...settledBets].reverse().map((bet, i) => (
-                <div key={i} className={`bg-[var(--bg-secondary)] rounded p-2 text-sm border shadow-inner ${bet.status === 'WON' ? 'border-green-500/50' : 'border-red-500/50'}`}>
-                  <div className="flex justify-between font-bold mb-1">
-                    <span className={bet.status === 'WON' ? 'text-green-400' : 'text-red-400'}>{bet.status}</span>
-                    <span>Wager: ${bet.wager}</span>
-                    {bet.status === 'WON' && <span className="text-green-400">Won: ${bet.potentialWin}</span>}
-                  </div>
-                  {bet.slip.map((leg, idx) => (
-                    <div key={idx} className="border-t border-[var(--border-color)] pt-1 mt-1 text-xs text-[var(--text-secondary)]">
-                      <div>{leg.home} vs {leg.away}</div>
-                      <div className="font-bold text-white">
-                        {getMarketLabel(leg.market, leg.home, leg.away)} @ {leg.odds}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ))}
-            </div>
-          </div>
+        {/* Bet History */}
+        {!isLive && currentMinute === 0 && (
+          <BetHistory settledBets={settledBets} />
         )}
 
         {/* Live Commentary Feed */}

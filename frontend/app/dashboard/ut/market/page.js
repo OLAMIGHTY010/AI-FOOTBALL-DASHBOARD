@@ -1,195 +1,176 @@
 "use client";
+
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useAppContext } from "@/app/context/AppContext";
 import { supabase } from "@/lib/supabaseClient";
 
-const API_URL = "http://localhost:8000";
-
 export default function TransferMarketPage() {
+  const { user, aiCoins, deductCoins, syncGameState } = useAppContext();
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [bankroll, setBankroll] = useState(0);
-  const [currentUserId, setCurrentUserId] = useState(null);
-  const [aiLoading, setAiLoading] = useState(false);
-  const [aiRecommendation, setAiRecommendation] = useState(null);
-
-  const runAiScout = async () => {
-    setAiLoading(true);
-    const club = JSON.parse(localStorage.getItem('my_club') || '[]');
-    try {
-      const res = await fetch(`${API_URL}/api/ut/recommend`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ club })
-      });
-      const data = await res.json();
-      if (data.success) {
-        setAiRecommendation(data);
-      } else {
-        alert(data.error || "Failed to run AI Scout.");
-      }
-    } catch (e) {
-      console.error(e);
-      alert("Error contacting AI Scout.");
-    }
-    setAiLoading(false);
-  };
+  const [processing, setProcessing] = useState(false);
 
   useEffect(() => {
     fetchMarket();
-    setBankroll(parseFloat(localStorage.getItem("bankroll") || "0"));
-    
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        setCurrentUserId(session.user.id);
-      }
-    });
   }, []);
 
   const fetchMarket = async () => {
     try {
-      const res = await fetch(`${API_URL}/api/ut/market`);
-      const data = await res.json();
-      setListings(data.listings || []);
-    } catch (e) {
-      console.error("Error fetching market", e);
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('transfer_market')
+        .select(`
+          id,
+          card,
+          price,
+          seller_id,
+          profiles:seller_id (username)
+        `)
+        .eq('status', 'active')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setListings(data || []);
+    } catch (err) {
+      console.error("Failed to fetch market:", err);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const buyPlayer = async (listing) => {
-    if (bankroll < listing.price) {
-      alert("Insufficient funds!");
+    if (!user) {
+      alert("You must be logged in to use the transfer market.");
       return;
     }
-    
-    // Deduct locally
-    const newBankroll = bankroll - listing.price;
-    setBankroll(newBankroll);
-    localStorage.setItem("bankroll", newBankroll.toString());
-
-    if (currentUserId) {
-      await supabase.from("wallets").update({ balance: newBankroll }).eq("user_id", currentUserId);
+    if (user.id === listing.seller_id) {
+      alert("You cannot buy your own listing!");
+      return;
+    }
+    if (aiCoins < listing.price) {
+      alert("Not enough AI Coins!");
+      return;
     }
 
+    setProcessing(true);
     try {
-      const res = await fetch(`${API_URL}/api/ut/market/buy`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ listing_id: listing.id, buyer_id: currentUserId || "guest" })
+      const { data, error } = await supabase.rpc('execute_transfer', {
+        p_listing_id: listing.id,
+        p_buyer_id: user.id
       });
-      const data = await res.json();
+
+      if (error) throw error;
       
-      if (data.success) {
-        alert(`Successfully bought ${data.player.name}!`);
-        // Add to club
-        const club = JSON.parse(localStorage.getItem('my_club') || '[]');
-        localStorage.setItem('my_club', JSON.stringify([...club, data.player]));
+      if (data && data.success) {
+        // Transfer successful on backend
+        alert(`Successfully bought ${listing.card.name}!`);
         
-        // Refresh market
-        fetchMarket();
-      } else {
-        alert("Failed to buy player. They may have already been sold.");
+        // Update local context
+        deductCoins(listing.price);
+        
+        // Update local club state
+        const currentClub = JSON.parse(localStorage.getItem('ut_club') || '[]');
+        const newClub = [...currentClub, data.card];
+        localStorage.setItem('ut_club', JSON.stringify(newClub));
+        // Note: The RPC already updated the DB, so we don't strictly need to sync it up, 
+        // but calling syncGameState keeps Context happy. We could just rely on context reloading,
+        // but let's push the new state to Context.
+        syncGameState('ut_club', newClub);
+        
+        // Refresh market listings
         fetchMarket();
       }
-    } catch (e) {
-      console.error(e);
-      alert("Error processing purchase.");
+    } catch (err) {
+      console.error(err);
+      alert(err.message || "Failed to buy player. They might have already been sold!");
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const getRarityColor = (rarity) => {
+    switch (rarity) {
+      case 'Bronze': return 'from-[#cd7f32] to-[#8b5a2b]';
+      case 'Silver': return 'from-[#e6e8fa] to-[#8a8d91]';
+      case 'Gold': return 'from-[#ffd700] to-[#b8860b]';
+      case 'Icon': return 'from-[#fff] to-[#d4af37] border border-[#d4af37]';
+      default: return 'from-gray-600 to-gray-800';
     }
   };
 
   return (
-    <div className="animate-fade-in max-w-6xl mx-auto pb-12">
-      <div className="flex justify-between items-end mb-8 border-b border-[var(--border-color)] pb-4">
+    <div className="p-6 animate-fade-in max-w-6xl mx-auto">
+      <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="text-3xl font-bold mb-2">💸 Transfer Market</h1>
-          <p className="text-[var(--text-secondary)]">Buy and sell players with other managers.</p>
+          <h1 className="text-3xl font-black gradient-text">Transfer Market</h1>
+          <p className="text-[var(--text-secondary)] font-bold">Buy and sell players with other managers.</p>
         </div>
-        <div className="flex gap-4 items-center">
-          <div className="text-xl font-black text-[var(--accent-primary)]">
-            Bank: ${bankroll.toFixed(2)}
+        <div className="flex items-center gap-4">
+          <div className="glass-card flex items-center gap-2 !py-2 !px-4">
+            <span className="text-xl">🪙</span>
+            <span className="font-black text-xl text-[var(--accent-primary)]">{aiCoins.toLocaleString()}</span>
           </div>
-          <Link href="/dashboard/ut" className="btn-secondary">
-            ⬅ Back to Store
+          <Link href="/dashboard/ut/club" className="btn-primary">
+            Sell Players
           </Link>
-          <button 
-            onClick={runAiScout} 
-            disabled={aiLoading}
-            className="btn-primary flex items-center gap-2 bg-gradient-to-r from-purple-500 to-indigo-600 border-none shadow-[0_0_15px_rgba(168,85,247,0.5)]"
-          >
-            {aiLoading ? "Scouting..." : "🤖 AI Scout"}
-          </button>
         </div>
       </div>
 
+      <div className="flex gap-4 mb-6">
+        <button onClick={fetchMarket} className="btn-secondary flex items-center gap-2">
+          <span>🔄</span> Refresh Market
+        </button>
+      </div>
+
       {loading ? (
-        <div className="text-center py-20 text-[var(--accent-primary)] animate-pulse">Loading Market Listings...</div>
-      ) : listings.length === 0 ? (
-        <div className="text-center py-20 text-[var(--text-secondary)] glass-card">
-          <div className="text-5xl mb-4">🛒</div>
-          <p>No players currently listed on the market.</p>
-          <p className="text-sm mt-2">Go to your Club and list someone!</p>
+        <div className="glass-card p-12 text-center text-xl font-bold animate-pulse text-[var(--text-secondary)]">
+          Scouting the market...
         </div>
       ) : (
-        <>
-          {aiRecommendation && (
-            <div className="mb-8 p-6 glass-card bg-gradient-to-r from-indigo-900/40 to-purple-900/40 border border-purple-500/50 flex flex-col md:flex-row items-center gap-6">
-              <div className="text-6xl animate-pulse">🤖</div>
-              <div className="flex-1">
-                <h3 className="text-xl font-bold text-purple-300 mb-2">AI Transfer Recommendation</h3>
-                <p className="text-[var(--text-secondary)]">{aiRecommendation.message}</p>
-              </div>
-              {aiRecommendation.recommendation && (
-                <button 
-                  onClick={() => buyPlayer(aiRecommendation.recommendation)}
-                  className="btn-primary whitespace-nowrap"
-                >
-                  Buy {aiRecommendation.recommendation.player.name}
-                </button>
-              )}
-            </div>
-          )}
-
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
-          {listings.map((listing) => (
-            <div key={listing.id} className="relative group w-full aspect-[2/3] rounded-xl p-3 flex flex-col items-center justify-between shadow-[0_4px_15px_rgba(0,0,0,0.3)] bg-gradient-to-b from-gray-800 to-gray-900 border border-[var(--border-color)]">
-              <div className="w-full flex justify-between items-start">
-                <div className="text-2xl font-black text-white">{listing.player.rating}</div>
-                <div className="text-right">
-                  <div className="font-bold text-sm text-[var(--text-secondary)]">{listing.player.position}</div>
-                  <div className="text-[10px] text-yellow-400">{listing.player.rarity}</div>
-                </div>
-              </div>
-              
-              <div className="text-center w-full">
-                <div className="text-lg font-black truncate text-white">{listing.player.name}</div>
-                <div className="text-xs font-semibold text-[var(--text-secondary)] truncate">{listing.player.team}</div>
-              </div>
-
-              <div className="w-full mt-2 bg-black/60 p-2 rounded text-center">
-                <div className="text-xs text-[var(--text-secondary)] uppercase font-bold">Buy Now</div>
-                <div className="text-xl font-black text-[var(--accent-primary)]">${listing.price.toFixed(0)}</div>
-              </div>
-              
-              {/* Overlay to Buy */}
-              <div className="absolute inset-0 bg-black/80 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-lg">
-                {listing.seller_id === currentUserId && currentUserId !== null ? (
-                  <div className="text-white font-bold text-center p-2 border border-white/20 rounded">
-                    Your Listing
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          {listings.map((listing, index) => {
+            const p = listing.card;
+            return (
+              <div key={listing.id} className="glass-card !p-0 overflow-hidden group hover:scale-105 transition-transform duration-300 relative">
+                <div className={`h-24 bg-gradient-to-br ${getRarityColor(p.rarity)} p-4 flex flex-col justify-end relative overflow-hidden`}>
+                  <div className="absolute top-2 right-2 text-3xl font-black opacity-30">{p.rating}</div>
+                  <div className="absolute top-2 left-2 text-sm font-bold bg-black/50 px-2 rounded backdrop-blur-sm">
+                    {p.position}
                   </div>
-                ) : (
+                  <h3 className="font-black text-xl text-white drop-shadow-md relative z-10">{p.name}</h3>
+                </div>
+                
+                <div className="p-4">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-[var(--text-secondary)] font-bold text-sm">Seller</span>
+                    <span className="font-bold">{listing.profiles?.username || 'Unknown'}</span>
+                  </div>
+                  <div className="flex justify-between items-center mb-4">
+                    <span className="text-[var(--text-secondary)] font-bold text-sm">Buy Now Price</span>
+                    <span className="font-black text-[var(--accent-primary)] text-lg">${listing.price.toLocaleString()}</span>
+                  </div>
+                  
                   <button 
                     onClick={() => buyPlayer(listing)}
-                    className="btn-primary w-3/4 py-2"
+                    disabled={processing || (user && user.id === listing.seller_id)}
+                    className="w-full btn-primary !py-2 flex items-center justify-center gap-2"
                   >
-                    Buy Now
+                    <span>💸</span> {processing ? 'Processing...' : 'Buy Now'}
                   </button>
-                )}
+                </div>
               </div>
+            );
+          })}
+          
+          {listings.length === 0 && (
+            <div className="col-span-full glass-card p-12 text-center">
+              <span className="text-4xl mb-4 block">🏜️</span>
+              <h3 className="text-xl font-bold mb-2">The market is quiet...</h3>
+              <p className="text-[var(--text-secondary)]">No players are currently listed for sale.</p>
             </div>
-          ))}
+          )}
         </div>
-        </>
       )}
     </div>
   );

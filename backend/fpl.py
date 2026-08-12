@@ -6,7 +6,7 @@ def get_fpl_data() -> List[Dict[str, Any]]:
     """Fetches live FPL data from the official API."""
     url = "https://fantasy.premierleague.com/api/bootstrap-static/"
     try:
-        response = requests.get(url, timeout=5)
+        response = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=5)
         if response.status_code == 200:
             data = response.json()
             teams = {t["id"]: t["name"] for t in data["teams"]}

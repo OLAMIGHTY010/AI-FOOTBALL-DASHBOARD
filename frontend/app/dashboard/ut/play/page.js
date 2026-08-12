@@ -1,196 +1,147 @@
 "use client";
+
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { supabase } from "@/lib/supabaseClient";
+import { useAppContext } from "@/app/context/AppContext";
 
 const API_URL = "http://localhost:8000";
 
-export default function UTPlayPage() {
+export default function PlayMatchPage() {
+  const { addCoins } = useAppContext();
   const [squad, setSquad] = useState([]);
+  const [matchResult, setMatchResult] = useState(null);
+  const [simulating, setSimulating] = useState(false);
   const [teamRating, setTeamRating] = useState(0);
-  const [matchState, setMatchState] = useState("prematch"); // prematch, playing, postmatch
-  const [minute, setMinute] = useState(0);
-  const [score, setScore] = useState({ home: 0, away: 0 }); // Home = User, Away = AI
-  const [events, setEvents] = useState([]);
-  
-  const AI_RATING = 82;
-  const AI_TEAM_NAME = "FC Nexus (AI)";
 
   useEffect(() => {
-    const savedSquad = JSON.parse(localStorage.getItem("my_squad") || "null");
-    if (savedSquad && savedSquad.length === 11 && !savedSquad.includes(null)) {
-      setSquad(savedSquad);
-      const total = savedSquad.reduce((acc, p) => acc + p.rating, 0);
-      setTeamRating(Math.round(total / 11));
+    const savedSquad = JSON.parse(localStorage.getItem('ut_active_squad') || '[]');
+    setSquad(savedSquad);
+    
+    const validPlayers = savedSquad.filter(p => p !== null);
+    if (validPlayers.length === 11) {
+      const avg = validPlayers.reduce((sum, p) => sum + p.rating, 0) / 11;
+      setTeamRating(Math.round(avg));
     }
   }, []);
 
-  const simulateMatch = () => {
-    if (squad.length !== 11) return;
-    
-    setMatchState("playing");
-    setMinute(0);
-    setScore({ home: 0, away: 0 });
-    setEvents([]);
-
-    // We will do a fast 15-second simulation loop (6 mins per tick)
-    let currentMin = 0;
-    let homeG = 0;
-    let awayG = 0;
-    const newEvents = [];
-
-    const interval = setInterval(() => {
-      currentMin += 6;
-      
-      // Goal logic based on ratings
-      // Higher rating = higher chance to score every 6 minutes
-      const homeChance = (teamRating / 100) * 0.15;
-      const awayChance = (AI_RATING / 100) * 0.15;
-
-      if (Math.random() < homeChance) {
-        homeG += 1;
-        const scorer = squad[Math.floor(Math.random() * squad.length)].name;
-        newEvents.push({ minute: currentMin, text: `⚽ GOAL! ${scorer} scores for your UT!`, team: "home" });
-        setScore({ home: homeG, away: awayG });
-      } else if (Math.random() < awayChance) {
-        awayG += 1;
-        newEvents.push({ minute: currentMin, text: `🔴 GOAL! ${AI_TEAM_NAME} scores.`, team: "away" });
-        setScore({ home: homeG, away: awayG });
-      }
-
-      setMinute(currentMin);
-      setEvents([...newEvents].reverse());
-
-      if (currentMin >= 90) {
-        clearInterval(interval);
-        handlePostMatch(homeG, awayG);
-      }
-    }, 500); // Fast simulation tick
-  };
-
-  const handlePostMatch = async (h, a) => {
-    setMatchState("postmatch");
-    
-    let payout = 0;
-    let resultText = "";
-    if (h > a) {
-      payout = 500;
-      resultText = "YOU WON!";
-    } else if (h === a) {
-      payout = 150;
-      resultText = "DRAW";
-    } else {
-      payout = 0;
-      resultText = "YOU LOST!";
+  const handleSimulate = async () => {
+    if (squad.filter(p => p !== null).length < 11) {
+      alert("You need a full squad of 11 players to play a match!");
+      return;
     }
 
-    if (payout > 0) {
-      let currentBankroll = parseFloat(localStorage.getItem("bankroll") || "0");
-      currentBankroll += payout;
-      localStorage.setItem("bankroll", currentBankroll.toString());
-      window.dispatchEvent(new Event("storage"));
+    setSimulating(true);
 
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        await supabase.from("wallets").update({ balance: currentBankroll }).eq("user_id", session.user.id);
-      }
+    try {
+      const res = await fetch(`${API_URL}/api/ut/simulate_match`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ squad: squad, user_id: "local_user" })
+      });
+      const data = await res.json();
       
-      setTimeout(() => alert(`Match finished: ${resultText}\nYou earned $${payout} for your club!`), 500);
-    } else {
-      setTimeout(() => alert(`Match finished: ${resultText}\nBetter luck next time.`), 500);
+      if (data.success) {
+        setTimeout(() => {
+          setMatchResult(data.match);
+          if (data.match.home_score > data.match.away_score) {
+            addCoins(500); // Win bonus
+          } else if (data.match.home_score === data.match.away_score) {
+            addCoins(100); // Draw bonus
+          }
+          setSimulating(false);
+        }, 3000); // 3 seconds suspense
+      } else {
+        alert(data.error);
+        setSimulating(false);
+      }
+    } catch (err) {
+      console.error(err);
+      setSimulating(false);
     }
   };
 
-  if (squad.length === 0) {
+  const isComplete = squad.filter(p => p !== null).length === 11;
+
+  if (matchResult) {
+    const isWin = matchResult.home_score > matchResult.away_score;
+    const isDraw = matchResult.home_score === matchResult.away_score;
+    const coinsWon = isWin ? 500 : (isDraw ? 100 : 0);
+
     return (
-      <div className="text-center py-20 text-[var(--text-secondary)] animate-fade-in">
-        <div className="text-6xl mb-4">⚠️</div>
-        <h2 className="text-2xl font-bold mb-4 text-white">Incomplete Squad</h2>
-        <p className="mb-6">You must build a full Starting 11 before playing Manager Mode.</p>
-        <Link href="/dashboard/ut/squad" className="btn-primary">Go to Squad Builder</Link>
+      <div className="max-w-4xl mx-auto p-4 text-center animate-fade-in space-y-6 pt-10">
+        <h1 className={`text-5xl font-black mb-2 ${isWin ? 'text-green-400' : isDraw ? 'text-yellow-400' : 'text-red-400'}`}>
+          {isWin ? "VICTORY!" : isDraw ? "DRAW" : "DEFEAT"}
+        </h1>
+        <p className="text-[var(--text-secondary)] text-xl">Match Simulation Complete</p>
+        
+        <div className="glass-card p-8 flex justify-between items-center max-w-2xl mx-auto my-8 border border-[var(--border-color)]">
+          <div className="text-center w-1/3">
+            <h2 className="font-bold text-2xl mb-2 text-[var(--accent-primary)]">Your UT</h2>
+            <div className="text-6xl font-black">{matchResult.home_score}</div>
+          </div>
+          <div className="text-center text-3xl font-black text-[var(--text-secondary)]">-</div>
+          <div className="text-center w-1/3">
+            <h2 className="font-bold text-2xl mb-2 text-red-400">AI Nexus</h2>
+            <div className="text-6xl font-black">{matchResult.away_score}</div>
+          </div>
+        </div>
+
+        <div className="glass-card p-4 inline-block mb-8">
+          <div className="text-lg text-[var(--text-secondary)]">Match Earnings</div>
+          <div className="text-3xl font-black text-yellow-400">+{coinsWon} AI Coins</div>
+        </div>
+
+        <div>
+          <button onClick={() => setMatchResult(null)} className="btn-primary px-8 py-3 mr-4">Play Again</button>
+          <Link href="/dashboard/ut" className="btn-secondary px-8 py-3">Back to Hub</Link>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="animate-fade-in max-w-5xl mx-auto">
-      <div className="text-center mb-8">
-        <h1 className="text-3xl font-bold mb-2">👔 Manager Mode</h1>
-        <p className="text-[var(--text-secondary)]">Take your Ultimate Team to the pitch and earn bankroll.</p>
-      </div>
+    <div className="max-w-5xl mx-auto p-4 space-y-6 animate-fade-in text-center pt-10">
+      <h1 className="text-4xl font-black mb-2">🏟️ Ultimate Team Match</h1>
+      <p className="text-[var(--text-secondary)]">Take your custom squad onto the pitch to earn AI Coins!</p>
 
-      <div className="glass-card mb-8">
-        <div className="flex justify-between items-center px-4 md:px-12 py-8">
-          {/* User Team */}
-          <div className="text-center flex-1">
-            <div className="text-5xl font-black text-[var(--accent-primary)] mb-2">{teamRating}</div>
-            <div className="font-bold text-xl">My Ultimate Team</div>
-            <div className="text-xs text-[var(--text-secondary)] mt-1">Managed by You</div>
-          </div>
-
-          {/* VS */}
-          <div className="text-4xl font-black text-[var(--text-secondary)] opacity-50 px-8">
-            VS
-          </div>
-
-          {/* AI Team */}
-          <div className="text-center flex-1">
-            <div className="text-5xl font-black text-red-500 mb-2">{AI_RATING}</div>
-            <div className="font-bold text-xl">{AI_TEAM_NAME}</div>
-            <div className="text-xs text-[var(--text-secondary)] mt-1">World Class AI</div>
-          </div>
+      {!isComplete ? (
+        <div className="glass-card p-10 max-w-2xl mx-auto mt-10">
+          <h2 className="text-2xl font-bold text-red-400 mb-4">Incomplete Squad</h2>
+          <p className="mb-6">You must build a full starting 11 before you can play a match.</p>
+          <Link href="/dashboard/ut/squad" className="btn-primary">Go to Squad Builder</Link>
         </div>
-
-        {matchState === "prematch" && (
-          <div className="border-t border-[var(--border-color)] p-6 text-center">
-            <h3 className="font-bold mb-2">Match Rewards</h3>
-            <div className="flex justify-center gap-6 mb-6 text-sm text-[var(--text-secondary)]">
-              <div>Win: <strong className="text-green-400">$500</strong></div>
-              <div>Draw: <strong className="text-yellow-400">$150</strong></div>
-              <div>Loss: <strong className="text-red-400">$0</strong></div>
+      ) : (
+        <div className="glass-card p-10 max-w-3xl mx-auto mt-10 relative overflow-hidden">
+          {simulating ? (
+            <div className="py-20 animate-pulse">
+              <div className="text-6xl mb-4">⚽</div>
+              <h2 className="text-2xl font-bold text-[var(--accent-primary)] mb-2">Simulating Match...</h2>
+              <p className="text-[var(--text-secondary)]">Your AI Manager is calculating tactics and player stats.</p>
             </div>
-            <button onClick={simulateMatch} className="btn-primary px-12 py-4 text-xl">
-              ▶ START MATCH
-            </button>
-          </div>
-        )}
-
-        {(matchState === "playing" || matchState === "postmatch") && (
-          <div className="border-t border-[var(--border-color)] p-0">
-            <div className="bg-black/40 p-6 flex justify-between items-center text-center">
-              <div className="flex-1 text-5xl font-black text-[var(--accent-primary)]">{score.home}</div>
-              <div className="flex flex-col items-center mx-4">
-                <div className={`text-3xl font-mono font-bold ${matchState === "playing" ? "text-white animate-pulse" : "text-[var(--text-secondary)]"}`}>
-                  {matchState === "playing" ? `${minute}'` : "FT"}
+          ) : (
+            <div>
+              <div className="flex justify-between items-center mb-10">
+                <div className="w-2/5 p-4 bg-[var(--bg-secondary)] border border-[var(--accent-primary)] rounded-lg">
+                  <h3 className="font-bold text-xl text-[var(--accent-primary)] mb-1">Your UT</h3>
+                  <div className="text-sm text-[var(--text-secondary)]">Rating: <span className="font-bold text-white">{teamRating}</span></div>
                 </div>
-                {matchState === "playing" && <div className="text-[10px] text-red-500 font-bold tracking-widest mt-1 uppercase">Live Simulation</div>}
+                <div className="text-4xl font-black italic text-gray-500">VS</div>
+                <div className="w-2/5 p-4 bg-red-900/20 border border-red-500 rounded-lg">
+                  <h3 className="font-bold text-xl text-red-400 mb-1">FC Nexus (AI)</h3>
+                  <div className="text-sm text-[var(--text-secondary)]">Rating: <span className="font-bold text-white">82</span></div>
+                </div>
               </div>
-              <div className="flex-1 text-5xl font-black text-red-500">{score.away}</div>
+
+              <button 
+                onClick={handleSimulate}
+                className="btn-primary w-full py-4 text-2xl font-black bg-gradient-to-r from-[var(--accent-primary)] to-emerald-400 text-black border-none shadow-[0_0_20px_rgba(0,255,135,0.4)] hover:scale-105"
+              >
+                KICK OFF
+              </button>
             </div>
-            
-            <div className="p-4 h-64 overflow-y-auto bg-[var(--bg-secondary)] border-t border-[var(--border-color)]">
-              {events.length === 0 ? (
-                <div className="text-center text-[var(--text-secondary)] py-8">Kicking off...</div>
-              ) : (
-                events.map((e, idx) => (
-                  <div key={idx} className="flex gap-4 mb-3 text-sm animate-fade-in">
-                    <div className="font-bold text-[var(--accent-primary)] w-8 text-right">{e.minute}'</div>
-                    <div className={e.team === 'home' ? 'text-white font-bold' : 'text-red-300'}>{e.text}</div>
-                  </div>
-                ))
-              )}
-            </div>
-            
-            {matchState === "postmatch" && (
-              <div className="p-4 text-center border-t border-[var(--border-color)] bg-black/20">
-                <button onClick={() => setMatchState("prematch")} className="btn-secondary">
-                  Play Another Match
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

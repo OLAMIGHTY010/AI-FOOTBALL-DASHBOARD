@@ -2,14 +2,16 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
+import { useAppContext } from "@/app/context/AppContext";
 
 const API_URL = "http://localhost:8000";
 
 export default function MyClubPage() {
+  const { user, addCoins, syncGameState } = useAppContext();
   const [club, setClub] = useState([]);
 
   useEffect(() => {
-    setClub(JSON.parse(localStorage.getItem("my_club") || "[]"));
+    setClub(JSON.parse(localStorage.getItem("ut_club") || "[]"));
   }, []);
 
   const sellCard = async (index, value) => {
@@ -17,44 +19,44 @@ export default function MyClubPage() {
     const newClub = [...club];
     newClub.splice(index, 1);
     setClub(newClub);
-    localStorage.setItem("my_club", JSON.stringify(newClub));
+    localStorage.setItem("ut_club", JSON.stringify(newClub));
+    if (user) syncGameState("ut_club", newClub);
 
     // Give money
-    let currentBankroll = parseFloat(localStorage.getItem("bankroll") || "0");
-    currentBankroll += value;
-    localStorage.setItem("bankroll", currentBankroll.toString());
-
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session) {
-      await supabase.from("wallets").update({ balance: currentBankroll }).eq("user_id", session.user.id);
-    }
+    addCoins(value);
   };
 
   const listOnMarket = async (index, card) => {
-    const price = prompt(`Enter listing price for ${card.name} (Min $${card.sell_value}):`, (card.sell_value * 2).toString());
-    if (!price || isNaN(price)) return;
-    const numPrice = parseFloat(price);
-    
-    const { data: { session } } = await supabase.auth.getSession();
-    const seller_id = session ? session.user.id : "guest_" + Math.random().toString(36).substr(2, 9);
-    
+    const price = prompt(`Enter Buy Now price for ${card.name} (Recommended: $${(card.rating * 1.5).toFixed(0)}):`);
+    if (!price || isNaN(price) || price <= 0) return;
+
+    if (!user) {
+      alert("You must be logged in to list players on the transfer market.");
+      return;
+    }
+
     try {
-      const res = await fetch(`${API_URL}/api/ut/market/list`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ player: card, price: numPrice, seller_id })
-      });
-      const data = await res.json();
-      if (data.success) {
-        alert("Listed on market!");
-        const newClub = [...club];
-        newClub.splice(index, 1);
-        setClub(newClub);
-        localStorage.setItem("my_club", JSON.stringify(newClub));
-      }
-    } catch (e) {
-      console.error(e);
-      alert("Failed to list on market");
+      const { data, error } = await supabase
+        .from('transfer_market')
+        .insert([{
+          seller_id: user.id,
+          card: card,
+          price: parseFloat(price)
+        }]);
+
+      if (error) throw error;
+
+      // Remove from local club
+      const newClub = [...club];
+      newClub.splice(index, 1);
+      setClub(newClub);
+      localStorage.setItem("ut_club", JSON.stringify(newClub));
+      syncGameState("ut_club", newClub);
+
+      alert(`Successfully listed ${card.name} for $${price}!`);
+    } catch (err) {
+      console.error(err);
+      alert("Failed to list player on the market.");
     }
   };
 

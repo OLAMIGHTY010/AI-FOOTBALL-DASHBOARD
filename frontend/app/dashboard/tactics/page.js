@@ -38,21 +38,49 @@ function TacticsPage() {
         setData(sportData);
         setSelectedFormation(Object.keys(sportData.formations)[0]);
         setSelectedStyle(Object.keys(sportData.tactical_styles)[0]);
+        
+        // Load user specific tactics
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          const loadRes = await fetch(`${API_URL}/api/tactics/load?user_id=${session.user.id}`);
+          const loadedData = await loadRes.json();
+          if (loadedData.formation) setSelectedFormation(loadedData.formation);
+          if (loadedData.style) setSelectedStyle(loadedData.style);
+        }
       } catch (err) {
         console.error("Failed to load tactics", err);
       }
       setLoading(false);
     };
     fetchTactics();
-  }, []);
+  }, [currentSport]);
 
-  const saveTactics = () => {
-    // In a real app we'd save to Supabase here
-    localStorage.setItem("user_tactics", JSON.stringify({
-      formation: selectedFormation,
-      style: selectedStyle
-    }));
-    alert("Tactics saved successfully! These will affect your team in simulations.");
+  const saveTactics = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session) {
+      try {
+        await fetch(`${API_URL}/api/tactics/save`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            user_id: session.user.id,
+            formation: selectedFormation,
+            style: selectedStyle
+          })
+        });
+        alert("Tactics saved to database successfully! These will affect your Ultimate Team in simulations.");
+      } catch (e) {
+        console.error("Error saving tactics", e);
+        alert("Failed to save tactics.");
+      }
+    } else {
+      // Fallback for guests
+      localStorage.setItem("user_tactics", JSON.stringify({
+        formation: selectedFormation,
+        style: selectedStyle
+      }));
+      alert("Tactics saved locally! Login to save permanently.");
+    }
   };
 
   if (loading) return <div>Loading tactics board...</div>;

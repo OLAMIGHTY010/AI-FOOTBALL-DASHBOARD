@@ -23,12 +23,12 @@ function StandingsPage() {
 
   useEffect(() => {
     fetchStandings();
-  }, []);
+  }, [currentSport]);
 
   const fetchStandings = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${API_URL}/api/real-standings`);
+      const res = await fetch(`${API_URL}/api/standings?sport=${currentSport}`);
       const data = await res.json();
       setStandings(data);
       setLeagues(Object.keys(data));
@@ -73,57 +73,70 @@ function StandingsPage() {
         ))}
       </div>
 
-      {currentSport === "basketball" ? (
-        <div className="glass-card text-center py-20">
-          <div className="text-4xl mb-4">🏀</div>
-          <h2 className="text-xl font-bold mb-2">Basketball Season Tracking Coming Soon</h2>
-          <p className="text-[var(--text-secondary)]">Currently, basketball matches are isolated simulations. Season standings are in development.</p>
-        </div>
-      ) : (
-        <div className="glass-card overflow-hidden !p-0">
-          <div className="overflow-x-auto">
-            <table className="league-table w-full">
-            <thead className="bg-black/20">
+      <div className="glass-card overflow-hidden !p-0">
+        <div className="overflow-x-auto">
+          <table className="league-table w-full">
+          <thead className="bg-black/20">
+            <tr>
+              <th className="w-12 text-center">#</th>
+              <th>{currentSport === 'tennis' ? 'Player' : currentSport === 'racing' ? 'Driver' : 'Club'}</th>
+              <th className="text-center">MP</th>
+              <th className="text-center">W</th>
+              {currentSport === 'football' && <th className="text-center">D</th>}
+              <th className="text-center">L</th>
+              <th className="text-center">{currentSport === 'basketball' ? 'PF' : currentSport === 'tennis' ? 'Sets W' : currentSport === 'racing' ? '-' : 'GF'}</th>
+              <th className="text-center">{currentSport === 'basketball' ? 'PA' : currentSport === 'tennis' ? 'Sets L' : currentSport === 'racing' ? '-' : 'GA'}</th>
+              <th className="text-center">{currentSport === 'basketball' ? 'PD' : currentSport === 'tennis' ? 'Sets Diff' : currentSport === 'racing' ? 'Wins' : 'GD'}</th>
+              <th className="text-center text-[var(--accent-primary)]">Pts</th>
+            </tr>
+          </thead>
+          <tbody>
+            {currentStandings && Object.entries(currentStandings).map(([team, stats], index) => {
+              let secondaryStat = stats.GD;
+              let pf = stats.GF;
+              let pa = stats.GA;
+              if (currentSport === 'basketball') {
+                secondaryStat = stats.PD;
+                pf = stats.PF;
+                pa = stats.PA;
+              }
+              else if (currentSport === 'tennis') {
+                secondaryStat = stats.SetsW - stats.SetsL;
+                pf = stats.SetsW;
+                pa = stats.SetsL;
+              }
+              else if (currentSport === 'racing') {
+                secondaryStat = stats.W;
+                pf = '-';
+                pa = '-';
+              }
+
+              return (
+                <tr key={team}>
+                  <td className="text-center font-bold text-[var(--text-secondary)]">{index + 1}</td>
+                  <td className="font-semibold">{team}</td>
+                  <td className="text-center text-[var(--text-secondary)]">{stats.P}</td>
+                  <td className="text-center">{stats.W}</td>
+                  {currentSport === 'football' && <td className="text-center">{stats.D || 0}</td>}
+                  <td className="text-center">{stats.L || 0}</td>
+                  <td className="text-center">{pf}</td>
+                  <td className="text-center">{pa}</td>
+                  <td className="text-center">{currentSport === 'football' || currentSport === 'basketball' || currentSport === 'tennis' ? (secondaryStat > 0 ? `+${secondaryStat}` : secondaryStat) : secondaryStat}</td>
+                  <td className="text-center font-bold text-[var(--accent-primary)]">{stats.Pts}</td>
+                </tr>
+              );
+            })}
+            {(!currentStandings || Object.keys(currentStandings).length === 0) && (
               <tr>
-                <th className="w-12 text-center">#</th>
-                <th>Club</th>
-                <th className="text-center">MP</th>
-                <th className="text-center">W</th>
-                <th className="text-center">D</th>
-                <th className="text-center">L</th>
-                <th className="text-center">GF</th>
-                <th className="text-center">GA</th>
-                <th className="text-center">GD</th>
-                <th className="text-center text-[var(--accent-primary)]">Pts</th>
+                <td colSpan={10} className="text-center py-8 text-[var(--text-secondary)]">
+                  No matches played yet.
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              {Array.isArray(currentStandings) && currentStandings.map((team, index) => (
-                <tr key={team.Team}>
-                  <td className="text-center font-bold text-[var(--text-secondary)]">{team.Rank || index + 1}</td>
-                  <td className="font-semibold">{team.Team}</td>
-                  <td className="text-center text-[var(--text-secondary)]">{team.GP}</td>
-                  <td className="text-center">{team.W}</td>
-                  <td className="text-center">{team.D}</td>
-                  <td className="text-center">{team.L}</td>
-                  <td className="text-center">{team.GF}</td>
-                  <td className="text-center">{team.GA}</td>
-                  <td className="text-center">{typeof team.GD === 'number' ? (team.GD > 0 ? `+${team.GD}` : team.GD) : team.GD}</td>
-                  <td className="text-center font-bold text-[var(--accent-primary)]">{team.Pts}</td>
-                </tr>
-              ))}
-              {(!currentStandings || currentStandings.length === 0) && (
-                <tr>
-                  <td colSpan={10} className="text-center py-8 text-[var(--text-secondary)]">
-                    No matches played yet.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-        </div>
-      )}
+            )}
+          </tbody>
+        </table>
+      </div>
+      </div>
     </div>
   );
 }

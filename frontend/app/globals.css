@@ -14,6 +14,18 @@
   --border-color: rgba(255, 255, 255, 0.08);
 }
 
+.light-theme {
+  --bg-primary: #f8fafc;
+  --bg-secondary: #f1f5f9;
+  --bg-card: #ffffff;
+  --bg-glass: rgba(255, 255, 255, 0.85);
+  --accent-primary: #059669; /* Slightly darker green for contrast */
+  --accent-secondary: #6d28d9;
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --border-color: rgba(0, 0, 0, 0.1);
+}
+
 body {
   background: var(--bg-primary);
   color: var(--text-primary);
@@ -254,4 +266,62 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--accent-primary);
+}
+
+/* UT Pack Simulator Animations */
+.perspective-1000 {
+  perspective: 1000px;
+}
+.transform-style-3d {
+  transform-style: preserve-3d;
+}
+.backface-hidden {
+  backface-visibility: hidden;
+}
+.rotate-y-180 {
+  transform: rotateY(180deg);
+}
+
+@keyframes packShake {
+  0% { transform: translateX(0) scale(1); }
+  25% { transform: translateX(-10px) scale(1.05) rotate(-2deg); }
+  50% { transform: translateX(10px) scale(1.05) rotate(2deg); }
+  75% { transform: translateX(-10px) scale(1.05) rotate(-2deg); }
+  100% { transform: translateX(0) scale(1.1); }
+}
+.animate-pack-shake {
+  animation: packShake 2.5s ease-in-out forwards;
+}
+
+@keyframes walkoutGlow {
+  0% { opacity: 0; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1.2); }
+  100% { opacity: 0; transform: scale(2); }
+}
+.animate-walkout-glow {
+  animation: walkoutGlow 1.5s ease-out forwards;
+}
+
+@keyframes ticker {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.animate-ticker {
+  animation: ticker 30s linear infinite;
+  display: flex;
+  width: max-content;
+}
+
+.animate-ticker:hover {
+  animation-play-state: paused;
+}
+
+@keyframes slideInRight {
+  0% { transform: translateX(100%); opacity: 0; }
+  100% { transform: translateX(0); opacity: 1; }
+}
+
+.animate-slide-in-right {
+  animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
