@@ -3,6 +3,7 @@ import { useSearchParams } from "next/navigation";
 import { Suspense, useState, useEffect } from "react";
 import VirtualTabs from "../components/VirtualTabs";
 import { supabase } from "@/lib/supabaseClient";
+import { useAppContext } from "@/app/context/AppContext";
 import { MARKET_LABELS, getMarketLabel } from "@/lib/utils";
 
 const API_URL = "http://localhost:8000";
@@ -17,6 +18,7 @@ export default function SportsbookPageWrapper() {
 
 function SportsbookPage() {
   const searchParams = useSearchParams();
+  const { addToast } = useAppContext();
   const currentSport = searchParams.get("sport") || "football";
   const apiEndpoint = currentSport === "basketball" ? `${API_URL}/api/fixtures/basketball` : currentSport === "tennis" ? `${API_URL}/api/fixtures/tennis` : currentSport === "racing" ? `${API_URL}/api/fixtures/racing` : `${API_URL}/api/fixtures`;
 
@@ -116,7 +118,7 @@ function SportsbookPage() {
           mutuallyExclusive[market] && mutuallyExclusive[market].includes(b.market)
         );
         if (hasConflict) {
-          alert("You cannot combine mutually exclusive markets in a Bet Builder!");
+          addToast("Bet Builder Error", "You cannot combine mutually exclusive markets!", "error");
           return prevSlip;
         }
         return [...prevSlip, { fixtureId: fixture.id, home: fixture.home?.name || fixture.name, away: fixture.away?.name || null, market, odds }];
@@ -140,7 +142,7 @@ function SportsbookPage() {
       if (bankroll === 0) {
         setShowBankModal(true);
       } else {
-        alert("Insufficient funds! Lower your wager or go bankrupt to visit the virtual bank.");
+        addToast("Insufficient Funds", "Lower your wager or go bankrupt to visit the virtual bank.", "error");
       }
       return;
     }
@@ -167,7 +169,7 @@ function SportsbookPage() {
     }
     
     setBetSlip([]);
-    alert(`Bet placed! Wager: $${wager} | Potential Win: $${potentialWin}`);
+    addToast("Bet Placed!", `Wager: $${wager} | Potential Win: $${potentialWin}`, "success");
   };
 
   const takeLoan = async () => {
@@ -187,7 +189,7 @@ function SportsbookPage() {
     }
     
     setShowBankModal(false);
-    alert("Loan approved! $500 added to your account. You now owe the bank $550.");
+    addToast("Loan Approved!", "$500 added to your account. You now owe the bank $550.", "success");
   };
 
   const filteredFixtures = selectedLeague === "All" || currentSport === "racing"

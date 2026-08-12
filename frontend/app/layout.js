@@ -2,6 +2,7 @@ import { Geist } from "next/font/google";
 import "./globals.css";
 import { AppProvider } from "./context/AppContext";
 import PWA from "./components/PWA";
+import ToastContainer from "./components/ToastContainer";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -28,6 +29,7 @@ export default function RootLayout({ children }) {
         <PWA />
         <AppProvider>
           {children}
+          <ToastContainer />
         </AppProvider>
       </body>
     </html>

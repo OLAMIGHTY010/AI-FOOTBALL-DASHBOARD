@@ -18,6 +18,22 @@ export function AppProvider({ children }) {
   const [loginStreak, setLoginStreak] = useState(0);
   const [dailyRewardAmount, setDailyRewardAmount] = useState(0);
 
+  // Toast Notifications
+  const [toasts, setToasts] = useState([]);
+
+  const addToast = (title, message, type = "info") => {
+    const id = Date.now().toString();
+    setToasts((prev) => [...prev, { id, title, message, type }]);
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+      removeToast(id);
+    }, 5000);
+  };
+
+  const removeToast = (id) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  };
+
   // Supabase Auth & Fetch
   useEffect(() => {
     // Check active session
@@ -200,7 +216,10 @@ export function AppProvider({ children }) {
       dailyRewardAmount,
       claimDailyReward,
       language,
-      changeLanguage
+      changeLanguage,
+      toasts,
+      addToast,
+      removeToast
     }}>
       {children}
       

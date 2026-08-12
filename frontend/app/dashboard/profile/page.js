@@ -15,7 +15,7 @@ import {
 } from "recharts";
 
 export default function ProfilePage() {
-  const { session, aiCoins, addCoins } = useAppContext();
+  const { session, aiCoins, addCoins, addToast } = useAppContext();
   
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState({ xp: 0, level: 1, username: 'Manager', avatar_url: null });
@@ -148,7 +148,11 @@ export default function ProfilePage() {
         setProfile(prev => ({ ...prev, xp: result.newXp, level: result.newLevel }));
         if (result.leveledUp) {
           addCoins(result.rewardCoins);
-          alert(`🎉 LEVEL UP! You reached Level ${result.newLevel} and earned ${result.rewardCoins} AI Coins!`);
+          addToast(
+            "🎉 LEVEL UP!",
+            `You reached Level ${result.newLevel} and earned ${result.rewardCoins} AI Coins!`,
+            "success"
+          );
         }
       }
     }
