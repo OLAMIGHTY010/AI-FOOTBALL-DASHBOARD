@@ -95,7 +95,7 @@ function SimulatePage() {
   const [settledBets, setSettledBets] = useState([]);
   const [initialStandings, setInitialStandings] = useState(null);
   const [liveStandings, setLiveStandings] = useState({});
-  const { deductCoins, playSound } = useAppContext();
+  const { aiCoins, setAiCoins, deductCoins, playSound } = useAppContext();
 
   // Betting States
   const [betSlip, setBetSlip] = useState([]);
@@ -419,10 +419,16 @@ function SimulatePage() {
       setPendingBets([]);
       
       if (totalWinnings > 0) {
-        let currentBankroll = parseFloat(localStorage.getItem("bankroll") || "0");
-        currentBankroll += totalWinnings;
-        localStorage.setItem("bankroll", currentBankroll.toString());
-        window.dispatchEvent(new Event("bankrollUpdate"));
+        const newBankroll = aiCoins + totalWinnings;
+        setAiCoins(newBankroll);
+        
+        // Push update to supabase
+        supabase.auth.getSession().then(({ data: { session } }) => {
+          if (session) {
+            supabase.from("profiles").update({ bankroll: newBankroll }).eq("id", session.user.id).then();
+          }
+        });
+        
         alert(`🎉 Full Time! Bets Settled! You won £${totalWinnings.toFixed(2)}!`);
       } else {
         alert("🏁 Full Time! Simulation Complete. All bets lost.");
@@ -536,11 +542,15 @@ function SimulatePage() {
       }
     }
 
-    const bankroll = parseFloat(localStorage.getItem("bankroll") || "0");
-    const newBankroll = bankroll + parseFloat(cashOutAmount);
+    const newBankroll = aiCoins + parseFloat(cashOutAmount);
+    setAiCoins(newBankroll);
     
-    localStorage.setItem("bankroll", newBankroll.toString());
-    window.dispatchEvent(new Event("storage"));
+    // Also push update to supabase
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        supabase.from("profiles").update({ bankroll: newBankroll }).eq("id", session.user.id).then();
+      }
+    });
 
     const updatedPending = [...pendingBets];
     updatedPending.splice(betIndex, 1);

@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
@@ -8,6 +8,11 @@ import random
 import random
 import string
 import scraper
+import requests
+import os
+import hmac
+import hashlib
+import json
 from database import supabase
 # from fpl_uefa import refresh_uefa_teams_cache
 from data import VIRTUAL_TEAMS
@@ -416,11 +421,11 @@ def run_simulation(req: SimulateRequest):
                 # Add to wallet balance
                 if bet.get("user_id") and supabase:
                     try:
-                        wallet_res = supabase.table("wallets").select("balance").eq("user_id", bet["user_id"]).execute()
+                        wallet_res = supabase.table("profiles").select("bankroll").eq("id", bet["user_id"]).execute()
                         if wallet_res.data:
-                            current_bal = float(wallet_res.data[0]["balance"])
+                            current_bal = float(wallet_res.data[0].get("bankroll", 0) or 0)
                             new_bal = current_bal + bet["potential_payout"]
-                            supabase.table("wallets").update({"balance": new_bal}).eq("user_id", bet["user_id"]).execute()
+                            supabase.table("profiles").update({"bankroll": new_bal}).eq("id", bet["user_id"]).execute()
                     except Exception as e:
                         print("Error updating wallet for bet:", e)
             settled_this_round.append(bet)
@@ -465,11 +470,11 @@ def place_parlay(req: ParlayRequest):
     # Deduct wager from wallet
     if req.user_id and supabase:
         try:
-            wallet_res = supabase.table("wallets").select("balance").eq("user_id", req.user_id).execute()
+            wallet_res = supabase.table("profiles").select("bankroll").eq("id", req.user_id).execute()
             if wallet_res.data:
-                current_bal = float(wallet_res.data[0]["balance"])
+                current_bal = float(wallet_res.data[0].get("bankroll", 0) or 0)
                 new_bal = current_bal - req.wager
-                supabase.table("wallets").update({"balance": new_bal}).eq("user_id", req.user_id).execute()
+                supabase.table("profiles").update({"bankroll": new_bal}).eq("id", req.user_id).execute()
         except Exception as e:
             print("Error deducting wager:", e)
 
@@ -517,11 +522,11 @@ def cashout_bet(req: CashOutRequest):
     # Add cash out amount to wallet
     if req.user_id and supabase:
         try:
-            wallet_res = supabase.table("wallets").select("balance").eq("user_id", req.user_id).execute()
+            wallet_res = supabase.table("profiles").select("bankroll").eq("id", req.user_id).execute()
             if wallet_res.data:
-                current_bal = float(wallet_res.data[0]["balance"])
+                current_bal = float(wallet_res.data[0].get("bankroll", 0) or 0)
                 new_bal = current_bal + req.cash_out_amount
-                supabase.table("wallets").update({"balance": new_bal}).eq("user_id", req.user_id).execute()
+                supabase.table("profiles").update({"bankroll": new_bal}).eq("id", req.user_id).execute()
         except Exception as e:
             print("Error adding cash out to wallet:", e)
             
@@ -1056,3 +1061,85 @@ def save_lineup(team_id: int, req: LineupRequest):
         return {"success": True, "message": "Lineup saved successfully"}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+class CheckoutRequest(BaseModel):
+    user_id: str
+    email: str
+    product_id: str
+    amount: int  # in Kobo
+
+@app.post("/api/checkout")
+def create_paystack_checkout(req: CheckoutRequest):
+    PAYSTACK_SECRET = os.environ.get("PAYSTACK_SECRET_KEY", "")
+    if not PAYSTACK_SECRET:
+        raise HTTPException(status_code=500, detail="Paystack secret key not configured")
+        
+    headers = {
+        "Authorization": f"Bearer {PAYSTACK_SECRET}",
+        "Content-Type": "application/json"
+    }
+    
+    # Store user_id and product_id in metadata so webhook knows what to credit
+    payload = {
+        "email": req.email,
+        "amount": req.amount,
+        "metadata": {
+            "user_id": req.user_id,
+            "product_id": req.product_id
+        },
+        "callback_url": "http://localhost:3000/dashboard/store?success=true",
+        "cancel_url": "http://localhost:3000/dashboard/store?canceled=true"
+    }
+    
+    res = requests.post("https://api.paystack.co/transaction/initialize", json=payload, headers=headers)
+    if res.status_code == 200:
+        return res.json().get("data", {})
+    else:
+        raise HTTPException(status_code=400, detail=res.text)
+
+@app.post("/api/webhook/paystack")
+async def paystack_webhook(request: Request, background_tasks: BackgroundTasks):
+    PAYSTACK_SECRET = os.environ.get("PAYSTACK_SECRET_KEY", "")
+    signature = request.headers.get("x-paystack-signature")
+    body = await request.body()
+    
+    # Verify signature
+    hash_obj = hmac.new(PAYSTACK_SECRET.encode('utf-8'), body, hashlib.sha512)
+    expected_sig = hash_obj.hexdigest()
+    
+    if not signature or signature != expected_sig:
+        raise HTTPException(status_code=400, detail="Invalid signature")
+        
+    event = json.loads(body)
+    
+    if event.get("event") == "charge.success":
+        data = event.get("data", {})
+        metadata = data.get("metadata", {})
+        user_id = metadata.get("user_id")
+        product_id = metadata.get("product_id")
+        
+        if user_id and product_id and supabase:
+            # Credit logic
+            def process_credit():
+                try:
+                    if product_id == "vip_sub":
+                        supabase.table("profiles").update({"is_vip": True}).eq("id", user_id).execute()
+                    else:
+                        coins_map = {
+                            "pack_5k": 5000,
+                            "pack_25k": 25000,
+                            "pack_100k": 100000
+                        }
+                        coins_to_add = coins_map.get(product_id, 0)
+                        if coins_to_add > 0:
+                            wallet_res = supabase.table("profiles").select("bankroll").eq("id", user_id).execute()
+                            if wallet_res.data:
+                                current_bal = float(wallet_res.data[0].get("bankroll", 0) or 0)
+                                new_bal = current_bal + coins_to_add
+                                supabase.table("profiles").update({"bankroll": new_bal}).eq("id", user_id).execute()
+                except Exception as e:
+                    print("Error crediting paystack webhook:", e)
+                    
+            background_tasks.add_task(process_credit)
+            
+    return {"status": "success"}

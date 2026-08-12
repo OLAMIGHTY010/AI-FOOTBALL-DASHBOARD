@@ -22,6 +22,8 @@ const NAV_ITEMS = [
   { href: "/dashboard/analytics", label: "Analytics", id: "analytics" },
   { href: "/dashboard/leaderboards", label: "Global Ranks", id: "globalRanks" },
   { href: "/dashboard/chat", label: "Global Chat", id: "globalChat" },
+  { href: "/dashboard/store", label: "🪙 Store", id: "store" },
+  { href: "/dashboard/subscription", label: "👑 VIP", id: "subscription" },
   { href: "/dashboard/profile", label: "Profile", id: "profile" },
 ];
 

@@ -18,7 +18,7 @@ export default function SportsbookPageWrapper() {
 
 function SportsbookPage() {
   const searchParams = useSearchParams();
-  const { addToast } = useAppContext();
+  const { addToast, aiCoins, deductCoins, setAiCoins } = useAppContext();
   const currentSport = searchParams.get("sport") || "football";
   const apiEndpoint = currentSport === "basketball" ? `${API_URL}/api/fixtures/basketball` : currentSport === "tennis" ? `${API_URL}/api/fixtures/tennis` : currentSport === "racing" ? `${API_URL}/api/fixtures/racing` : `${API_URL}/api/fixtures`;
 
@@ -137,18 +137,17 @@ function SportsbookPage() {
 
   const placeBet = async () => {
     if (betSlip.length === 0) return;
-    const bankroll = parseFloat(localStorage.getItem("bankroll") || "0");
-    if (wager > bankroll) {
-      if (bankroll === 0) {
+    
+    if (wager > aiCoins) {
+      if (aiCoins === 0) {
         setShowBankModal(true);
       } else {
         addToast("Insufficient Funds", "Lower your wager or go bankrupt to visit the virtual bank.", "error");
       }
       return;
     }
-    const newBankroll = bankroll - wager;
-    localStorage.setItem("bankroll", newBankroll.toString());
-    window.dispatchEvent(new Event("storage"));
+    
+    deductCoins(wager);
     
     const { data: { session } } = await supabase.auth.getSession();
     if (session) {
@@ -174,18 +173,16 @@ function SportsbookPage() {
 
   const takeLoan = async () => {
     let debt = parseFloat(localStorage.getItem("virtual_debt") || "0");
-    let bankroll = parseFloat(localStorage.getItem("bankroll") || "0");
     
     debt += 550;
-    bankroll += 500;
+    const newBankroll = aiCoins + 500;
     
     localStorage.setItem("virtual_debt", debt.toString());
-    localStorage.setItem("bankroll", bankroll.toString());
-    window.dispatchEvent(new Event("storage"));
+    setAiCoins(newBankroll);
     
     const { data: { session } } = await supabase.auth.getSession();
     if (session) {
-      await supabase.from("wallets").update({ balance: bankroll }).eq("user_id", session.user.id);
+      await supabase.from("profiles").update({ bankroll: newBankroll }).eq("id", session.user.id);
     }
     
     setShowBankModal(false);
