@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useAppContext } from "@/app/context/AppContext";
 import { supabase } from "@/lib/supabaseClient";
@@ -10,6 +10,14 @@ export default function TransferMarketPage() {
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
+
+  // Filters State
+  const [searchTerm, setSearchTerm] = useState("");
+  const [positionFilter, setPositionFilter] = useState("All");
+  const [rarityFilter, setRarityFilter] = useState("All");
+  const [minPrice, setMinPrice] = useState("");
+  const [maxPrice, setMaxPrice] = useState("");
+  const [sortBy, setSortBy] = useState("newest");
 
   useEffect(() => {
     fetchMarket();
@@ -99,8 +107,48 @@ export default function TransferMarketPage() {
     }
   };
 
+  const filteredAndSortedListings = useMemo(() => {
+    let result = [...listings];
+
+    if (searchTerm) {
+      result = result.filter(l => l.card.name.toLowerCase().includes(searchTerm.toLowerCase()));
+    }
+    if (positionFilter !== "All") {
+      result = result.filter(l => l.card.position === positionFilter);
+    }
+    if (rarityFilter !== "All") {
+      result = result.filter(l => l.card.rarity === rarityFilter);
+    }
+    if (minPrice !== "") {
+      result = result.filter(l => l.price >= parseInt(minPrice));
+    }
+    if (maxPrice !== "") {
+      result = result.filter(l => l.price <= parseInt(maxPrice));
+    }
+
+    result.sort((a, b) => {
+      switch (sortBy) {
+        case "price_asc": return a.price - b.price;
+        case "price_desc": return b.price - a.price;
+        case "rating_desc": return b.card.rating - a.card.rating;
+        case "newest": default: return 0; // Already sorted by created_at desc from API
+      }
+    });
+
+    return result;
+  }, [listings, searchTerm, positionFilter, rarityFilter, minPrice, maxPrice, sortBy]);
+
+  const resetFilters = () => {
+    setSearchTerm("");
+    setPositionFilter("All");
+    setRarityFilter("All");
+    setMinPrice("");
+    setMaxPrice("");
+    setSortBy("newest");
+  };
+
   return (
-    <div className="p-6 animate-fade-in max-w-6xl mx-auto">
+    <div className="p-6 animate-fade-in max-w-7xl mx-auto">
       <div className="flex justify-between items-center mb-8">
         <div>
           <h1 className="text-3xl font-black gradient-text">Transfer Market</h1>
@@ -117,61 +165,142 @@ export default function TransferMarketPage() {
         </div>
       </div>
 
-      <div className="flex gap-4 mb-6">
-        <button onClick={fetchMarket} className="btn-secondary flex items-center gap-2">
-          <span>🔄</span> Refresh Market
-        </button>
-      </div>
+      <div className="flex flex-col lg:flex-row gap-6">
+        {/* SIDEBAR FILTERS */}
+        <div className="w-full lg:w-64 flex-shrink-0 space-y-6">
+          <div className="glass-card p-4">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="font-black text-lg">Filters</h3>
+              <button onClick={resetFilters} className="text-sm text-[var(--text-secondary)] hover:text-white transition-colors">Reset</button>
+            </div>
+            
+            {/* Search */}
+            <div className="mb-4">
+              <label className="block text-xs font-bold text-[var(--text-secondary)] mb-2">Search Player</label>
+              <input 
+                type="text" 
+                placeholder="Messi, Ronaldo..." 
+                className="input-field w-full"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
 
-      {loading ? (
-        <div className="glass-card p-12 text-center text-xl font-bold animate-pulse text-[var(--text-secondary)]">
-          Scouting the market...
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {listings.map((listing, index) => {
-            const p = listing.card;
-            return (
-              <div key={listing.id} className="glass-card !p-0 overflow-hidden group hover:scale-105 transition-transform duration-300 relative">
-                <div className={`h-24 bg-gradient-to-br ${getRarityColor(p.rarity)} p-4 flex flex-col justify-end relative overflow-hidden`}>
-                  <div className="absolute top-2 right-2 text-3xl font-black opacity-30">{p.rating}</div>
-                  <div className="absolute top-2 left-2 text-sm font-bold bg-black/50 px-2 rounded backdrop-blur-sm">
-                    {p.position}
-                  </div>
-                  <h3 className="font-black text-xl text-white drop-shadow-md relative z-10">{p.name}</h3>
-                </div>
-                
-                <div className="p-4">
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-[var(--text-secondary)] font-bold text-sm">Seller</span>
-                    <span className="font-bold">{listing.profiles?.username || 'Unknown'}</span>
-                  </div>
-                  <div className="flex justify-between items-center mb-4">
-                    <span className="text-[var(--text-secondary)] font-bold text-sm">Buy Now Price</span>
-                    <span className="font-black text-[var(--accent-primary)] text-lg">${listing.price.toLocaleString()}</span>
-                  </div>
-                  
-                  <button 
-                    onClick={() => buyPlayer(listing)}
-                    disabled={processing || (user && user.id === listing.seller_id)}
-                    className="w-full btn-primary !py-2 flex items-center justify-center gap-2"
-                  >
-                    <span>💸</span> {processing ? 'Processing...' : 'Buy Now'}
-                  </button>
-                </div>
+            {/* Position */}
+            <div className="mb-4">
+              <label className="block text-xs font-bold text-[var(--text-secondary)] mb-2">Position</label>
+              <select className="input-field w-full" value={positionFilter} onChange={(e) => setPositionFilter(e.target.value)}>
+                <option value="All">All Positions</option>
+                <option value="FWD">Forward (FWD)</option>
+                <option value="MID">Midfielder (MID)</option>
+                <option value="DEF">Defender (DEF)</option>
+                <option value="GK">Goalkeeper (GK)</option>
+              </select>
+            </div>
+
+            {/* Rarity */}
+            <div className="mb-4">
+              <label className="block text-xs font-bold text-[var(--text-secondary)] mb-2">Rarity</label>
+              <select className="input-field w-full" value={rarityFilter} onChange={(e) => setRarityFilter(e.target.value)}>
+                <option value="All">All Rarities</option>
+                <option value="Icon">Icon</option>
+                <option value="Gold">Gold</option>
+                <option value="Silver">Silver</option>
+                <option value="Bronze">Bronze</option>
+              </select>
+            </div>
+
+            {/* Price */}
+            <div className="mb-4">
+              <label className="block text-xs font-bold text-[var(--text-secondary)] mb-2">Price Range</label>
+              <div className="flex gap-2">
+                <input 
+                  type="number" 
+                  placeholder="Min" 
+                  className="input-field w-full px-2"
+                  value={minPrice}
+                  onChange={(e) => setMinPrice(e.target.value)}
+                />
+                <input 
+                  type="number" 
+                  placeholder="Max" 
+                  className="input-field w-full px-2"
+                  value={maxPrice}
+                  onChange={(e) => setMaxPrice(e.target.value)}
+                />
               </div>
-            );
-          })}
-          
-          {listings.length === 0 && (
-            <div className="col-span-full glass-card p-12 text-center">
-              <span className="text-4xl mb-4 block">🏜️</span>
-              <h3 className="text-xl font-bold mb-2">The market is quiet...</h3>
-              <p className="text-[var(--text-secondary)]">No players are currently listed for sale.</p>
+            </div>
+
+            {/* Sort */}
+            <div className="mb-4">
+              <label className="block text-xs font-bold text-[var(--text-secondary)] mb-2">Sort By</label>
+              <select className="input-field w-full" value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
+                <option value="newest">Newest Listed</option>
+                <option value="price_asc">Price: Low to High</option>
+                <option value="price_desc">Price: High to Low</option>
+                <option value="rating_desc">Rating: Highest First</option>
+              </select>
+            </div>
+
+            <button onClick={fetchMarket} className="w-full btn-secondary flex items-center justify-center gap-2 mt-2">
+              <span>🔄</span> Refresh Market
+            </button>
+          </div>
+        </div>
+
+        {/* MAIN CONTENT (CARDS) */}
+        <div className="flex-1 min-w-0">
+          {loading ? (
+            <div className="glass-card p-12 text-center text-xl font-bold animate-pulse text-[var(--text-secondary)]">
+              Scouting the market...
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {filteredAndSortedListings.map((listing, index) => {
+                const p = listing.card;
+                return (
+                  <div key={listing.id} className="glass-card !p-0 overflow-hidden group hover:scale-105 transition-transform duration-300 relative">
+                    <div className={`h-24 bg-gradient-to-br ${getRarityColor(p.rarity)} p-4 flex flex-col justify-end relative overflow-hidden`}>
+                      <div className="absolute top-2 right-2 text-3xl font-black opacity-30">{p.rating}</div>
+                      <div className="absolute top-2 left-2 text-sm font-bold bg-black/50 px-2 rounded backdrop-blur-sm">
+                        {p.position}
+                      </div>
+                      <h3 className="font-black text-xl text-white drop-shadow-md relative z-10">{p.name}</h3>
+                    </div>
+                    
+                    <div className="p-4">
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-[var(--text-secondary)] font-bold text-sm">Seller</span>
+                        <span className="font-bold">{listing.profiles?.username || 'Unknown'}</span>
+                      </div>
+                      <div className="flex justify-between items-center mb-4">
+                        <span className="text-[var(--text-secondary)] font-bold text-sm">Buy Now Price</span>
+                        <span className="font-black text-[var(--accent-primary)] text-lg">${listing.price.toLocaleString()}</span>
+                      </div>
+                      
+                      <button 
+                        onClick={() => buyPlayer(listing)}
+                        disabled={processing || (user && user.id === listing.seller_id)}
+                        className="w-full btn-primary !py-2 flex items-center justify-center gap-2"
+                      >
+                        <span>💸</span> {processing ? 'Processing...' : 'Buy Now'}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+              
+              {filteredAndSortedListings.length === 0 && (
+                <div className="col-span-full glass-card p-12 text-center">
+                  <span className="text-4xl mb-4 block">🏜️</span>
+                  <h3 className="text-xl font-bold mb-2">No players found</h3>
+                  <p className="text-[var(--text-secondary)]">Try adjusting your filters or search terms.</p>
+                </div>
+              )}
             </div>
           )}
         </div>
-      )}
+      </div>
     </div>
   );
 }

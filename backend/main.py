@@ -425,6 +425,15 @@ def run_simulation(req: SimulateRequest):
                         print("Error updating wallet for bet:", e)
             settled_this_round.append(bet)
             settled_virtual_bets.append(bet)
+            
+            # Sync settlement to Supabase
+            if supabase:
+                try:
+                    supabase.table("virtual_bets").update({
+                        "status": bet["status"]
+                    }).eq("id", bet["id"]).execute()
+                except Exception as e:
+                    print("Error updating bet status in Supabase:", e)
 
     # Generate Virtual Fixtures for other sports for next gameweek
     current_fixtures = generate_fixtures()
@@ -466,6 +475,21 @@ def place_parlay(req: ParlayRequest):
 
     pending_virtual_bets.append(bet_record)
     
+    # Sync placement to Supabase
+    if supabase:
+        try:
+            supabase.table("virtual_bets").insert({
+                "id": bet_record["id"],
+                "user_id": bet_record["user_id"],
+                "wager": bet_record["wager"],
+                "combined_odds": bet_record["combined_odds"],
+                "potential_payout": bet_record["potential_payout"],
+                "legs": bet_record["legs"],
+                "status": bet_record["status"]
+            }).execute()
+        except Exception as e:
+            print("Error inserting bet into Supabase:", e)
+    
     return bet_record
 
 class CashOutRequest(BaseModel):
@@ -500,6 +524,16 @@ def cashout_bet(req: CashOutRequest):
                 supabase.table("wallets").update({"balance": new_bal}).eq("user_id", req.user_id).execute()
         except Exception as e:
             print("Error adding cash out to wallet:", e)
+            
+    # Sync cashout to Supabase
+    if supabase:
+        try:
+            supabase.table("virtual_bets").update({
+                "status": "CASH OUT",
+                "potential_payout": req.cash_out_amount
+            }).eq("id", bet_to_cashout["id"]).execute()
+        except Exception as e:
+            print("Error updating cashout in Supabase:", e)
             
     return bet_to_cashout
 
