@@ -62,3 +62,11 @@ def get_fpl_entry_history(entry_id: int):
     except Exception as e:
         print(f"Error fetching FPL entry history {entry_id}: {e}")
         return {"error": "Failed to fetch entry history"}
+
+def get_fpl_picks(entry_id: int, event_id: int):
+    try:
+        res = requests.get(f"{FPL_BASE_URL}/entry/{entry_id}/event/{event_id}/picks/", headers={"User-Agent": "Mozilla/5.0"}, timeout=5)
+        return res.json()
+    except Exception as e:
+        print(f"Error fetching FPL picks for {entry_id} event {event_id}: {e}")
+        return {"error": "Failed to fetch entry picks"}

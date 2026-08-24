@@ -66,9 +66,10 @@ export function AppProvider({ children }) {
         .from('profiles')
         .select('*')
         .eq('id', userId)
-        .single();
+        .maybeSingle();
       
       if (error) throw error;
+      
       if (data) {
         setAiCoins(parseFloat(data.bankroll || data.ai_coins || 1000));
         
@@ -76,6 +77,20 @@ export function AppProvider({ children }) {
         if (data.ut_club) localStorage.setItem('ut_club', JSON.stringify(data.ut_club));
         if (data.active_squad) localStorage.setItem('ut_active_squad', JSON.stringify(data.active_squad));
         if (data.season_state) localStorage.setItem('season_state', JSON.stringify(data.season_state));
+      } else {
+        // If profile doesn't exist, let the backend (which has service key) create it
+        const initRes = await fetch("http://localhost:8000/api/profile/init", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ user_id: userId })
+        });
+        
+        if (initRes.ok) {
+          const newProfile = await initRes.json();
+          setAiCoins(parseFloat(newProfile.bankroll || 1000));
+        } else {
+          console.error("Error creating profile via backend:", await initRes.text());
+        }
       }
     } catch (err) {
       console.error("Error fetching user profile:", err);

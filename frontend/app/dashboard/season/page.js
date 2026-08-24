@@ -8,6 +8,7 @@ export default function SeasonHubPage() {
   const [seasonState, setSeasonState] = useState(null);
   const [table, setTable] = useState([]);
   const [isClient, setIsClient] = useState(false);
+  const [isAutoSimulating, setIsAutoSimulating] = useState(false);
 
   useEffect(() => {
     setIsClient(true);
@@ -34,12 +35,30 @@ export default function SeasonHubPage() {
     setSeasonState(newState);
     setTable(calculateTable(newState.leagueId, newState.results));
     localStorage.setItem("seasonState", JSON.stringify(newState));
+    
+    // Stop auto-simulating if finished
+    if (newState.currentWeek >= newState.schedule.length) {
+      setIsAutoSimulating(false);
+    }
   };
+
+  useEffect(() => {
+    let interval;
+    if (isAutoSimulating && seasonState && seasonState.currentWeek < seasonState.schedule.length) {
+      interval = setInterval(() => {
+        handleSimulateWeek();
+      }, 1500); // Simulate a week every 1.5 seconds
+    } else if (isAutoSimulating) {
+      setIsAutoSimulating(false);
+    }
+    return () => clearInterval(interval);
+  }, [isAutoSimulating, seasonState]);
 
   const handleResetSeason = () => {
     if(confirm("Are you sure you want to abandon the current season?")) {
       setSeasonState(null);
       setTable([]);
+      setIsAutoSimulating(false);
       localStorage.removeItem("seasonState");
     }
   };
@@ -58,13 +77,13 @@ export default function SeasonHubPage() {
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {Object.values(LEAGUES).map((league) => (
-            <div key={league.id} className="glass-card flex flex-col items-center p-8 border-t-4 border-transparent hover:border-[var(--accent-primary)] transition-all">
+          {Object.entries(LEAGUES).map(([key, league]) => (
+            <div key={key} className="glass-card flex flex-col items-center p-8 border-t-4 border-transparent hover:border-[var(--accent-primary)] transition-all">
               <div className="text-5xl mb-4">🌍</div>
               <h2 className="text-2xl font-bold mb-2">{league.name}</h2>
               <p className="text-[var(--text-secondary)] mb-6">{league.teams.length} Teams</p>
               <button 
-                onClick={() => handleStartSeason(league.id)}
+                onClick={() => handleStartSeason(key)}
                 className="btn-primary w-full py-3 font-bold"
               >
                 Start Season
@@ -122,12 +141,25 @@ export default function SeasonHubPage() {
               </p>
             </div>
             {!isFinished && (
-              <button 
-                onClick={handleSimulateWeek}
-                className="btn-primary px-8 py-4 text-lg font-black animate-pulse-glow"
-              >
-                Simulate Week ⏭️
-              </button>
+              <div className="flex gap-4">
+                <button 
+                  onClick={handleSimulateWeek}
+                  disabled={isAutoSimulating}
+                  className={`btn-secondary px-6 py-4 text-lg font-bold ${isAutoSimulating ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  Simulate Week ⏭️
+                </button>
+                <button 
+                  onClick={() => setIsAutoSimulating(!isAutoSimulating)}
+                  className={`px-8 py-4 text-lg font-black rounded-lg transition-all shadow-lg ${
+                    isAutoSimulating 
+                      ? 'bg-red-500 hover:bg-red-600 text-white animate-pulse' 
+                      : 'bg-[#00ff87] hover:bg-[#00cc6a] text-black animate-pulse-glow'
+                  }`}
+                >
+                  {isAutoSimulating ? "🛑 Stop Sim" : "▶️ Auto-Simulate"}
+                </button>
+              </div>
             )}
           </div>
 

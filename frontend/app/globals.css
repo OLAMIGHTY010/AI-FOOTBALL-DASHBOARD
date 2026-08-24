@@ -29,22 +29,25 @@
 body {
   background: var(--bg-primary);
   color: var(--text-primary);
-  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  font-family: var(--font-outfit), system-ui, sans-serif;
 }
 
 /* Glassmorphism Card */
 .glass-card {
   background: var(--bg-glass);
-  backdrop-filter: blur(16px);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
   border: 1px solid var(--border-color);
   border-radius: 16px;
   padding: 1.5rem;
-  transition: all 0.3s ease;
+  transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), border-color 0.4s ease, box-shadow 0.4s ease;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
 }
 
 .glass-card:hover {
-  border-color: rgba(0, 212, 170, 0.3);
-  box-shadow: 0 0 30px rgba(0, 212, 170, 0.08);
+  border-color: rgba(0, 212, 170, 0.4);
+  box-shadow: 0 8px 32px rgba(0, 212, 170, 0.15);
+  transform: translateY(-4px);
 }
 
 /* Gradient Text */

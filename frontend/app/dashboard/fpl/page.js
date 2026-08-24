@@ -30,6 +30,29 @@ export default function FPLPage() {
   const [squad, setSquad] = useState(null);
   const [punditReport, setPunditReport] = useState(null);
   const [reportLoading, setReportLoading] = useState(false);
+  
+  // Analyzer state
+  const [fplIdInput, setFplIdInput] = useState("");
+  const [liveFplData, setLiveFplData] = useState(null);
+  const [liveFplLoading, setLiveFplLoading] = useState(false);
+  
+  const handleAnalyzeLiveFpl = async () => {
+    if (!fplIdInput) return;
+    setLiveFplLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/api/fpl/my-team/${fplIdInput}`);
+      const data = await res.json();
+      if (data.error) {
+        alert(data.error);
+        setLiveFplData(null);
+      } else {
+        setLiveFplData(data);
+      }
+    } catch (err) {
+      alert("Failed to analyze team.");
+    }
+    setLiveFplLoading(false);
+  };
 
   const fetchPunditReport = async () => {
     setReportLoading(true);
@@ -322,6 +345,9 @@ export default function FPLPage() {
         <button onClick={() => setActiveTab("scout")} className={`px-4 py-2 rounded font-bold ${activeTab === 'scout' ? 'bg-[var(--accent-primary)] text-black' : 'bg-[var(--bg-card)]'}`}>
           🔍 Scout AI
         </button>
+        <button onClick={() => setActiveTab("analyzer")} className={`px-4 py-2 rounded font-bold ${activeTab === 'analyzer' ? 'bg-[var(--accent-primary)] text-black' : 'bg-[var(--bg-card)]'}`}>
+          🧠 AI Analyzer (Live)
+        </button>
         <button onClick={() => setActiveTab("team")} className={`px-4 py-2 rounded font-bold ${activeTab === 'team' ? 'bg-[var(--accent-primary)] text-black' : 'bg-[var(--bg-card)]'}`}>
           👔 My Team
         </button>
@@ -438,6 +464,76 @@ export default function FPLPage() {
         <div className="max-w-7xl mx-auto grid grid-cols-1 xl:grid-cols-2 gap-6">
           <TransferRecommender />
           <PlayerRadarChart players={players} />
+        </div>
+      )}
+
+      {/* AI Analyzer (Live) */}
+      {!loading && activeTab === "analyzer" && (
+        <div className="glass-card animate-fade-in p-8 border-t-4 border-amber-400 max-w-4xl mx-auto">
+          <div className="text-center mb-8">
+            <h2 className="text-3xl font-black mb-2 text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-yellow-600">🧠 Real FPL AI Analyzer</h2>
+            <p className="text-[var(--text-secondary)]">Enter your official FPL Manager ID to get an instant AI evaluation of your live squad.</p>
+          </div>
+          
+          <div className="flex justify-center gap-4 mb-8">
+            <input 
+              type="text" 
+              placeholder="e.g. 123456" 
+              value={fplIdInput}
+              onChange={(e) => setFplIdInput(e.target.value)}
+              className="p-3 rounded bg-black/40 border border-[var(--border-color)] focus:border-amber-400 outline-none w-64 text-center font-bold text-xl"
+            />
+            <button 
+              onClick={handleAnalyzeLiveFpl}
+              disabled={liveFplLoading}
+              className={`btn-primary px-8 py-3 font-bold bg-amber-500 hover:bg-amber-600 text-black ${liveFplLoading ? 'opacity-50 animate-pulse' : ''}`}
+            >
+              {liveFplLoading ? "Scanning Database..." : "Analyze Team"}
+            </button>
+          </div>
+
+          {liveFplData && (
+            <div className="animate-fade-in space-y-6">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-black/30 p-4 rounded-lg text-center border border-white/5">
+                  <div className="text-xs text-[var(--text-secondary)] uppercase">Manager</div>
+                  <div className="font-bold">{liveFplData.manager_name}</div>
+                </div>
+                <div className="bg-black/30 p-4 rounded-lg text-center border border-white/5">
+                  <div className="text-xs text-[var(--text-secondary)] uppercase">Team Name</div>
+                  <div className="font-bold truncate" title={liveFplData.team_name}>{liveFplData.team_name}</div>
+                </div>
+                <div className="bg-black/30 p-4 rounded-lg text-center border border-white/5">
+                  <div className="text-xs text-[var(--text-secondary)] uppercase">Total Points</div>
+                  <div className="font-bold text-green-400 text-xl">{liveFplData.overall_points}</div>
+                </div>
+                <div className="bg-black/30 p-4 rounded-lg text-center border border-amber-400/30">
+                  <div className="text-xs text-amber-400 uppercase font-bold">AI Rank Prediction</div>
+                  <div className="font-black text-white text-lg">{liveFplData.ai_report.prediction}</div>
+                </div>
+              </div>
+
+              <div className="glass-card bg-gradient-to-br from-blue-900/20 to-purple-900/20 p-6 border-l-4 border-blue-400">
+                <h3 className="font-black text-xl mb-4 text-blue-300">🤖 AI Coach Report</h3>
+                <div className="grid md:grid-cols-3 gap-6">
+                  <div className="bg-black/40 p-4 rounded border-t-2 border-green-400">
+                    <div className="text-sm text-green-400 font-bold mb-1">RECOMMENDED BUY</div>
+                    <div className="font-black text-lg">{liveFplData.ai_report.buy}</div>
+                    <div className="text-xs text-gray-400 mt-2">Highest projected points not in your squad.</div>
+                  </div>
+                  <div className="bg-black/40 p-4 rounded border-t-2 border-red-400">
+                    <div className="text-sm text-red-400 font-bold mb-1">RECOMMENDED SELL</div>
+                    <div className="font-black text-lg">{liveFplData.ai_report.sell}</div>
+                    <div className="text-xs text-gray-400 mt-2">Weakest link based on upcoming fixtures.</div>
+                  </div>
+                  <div className="bg-black/40 p-4 rounded border-t-2 border-yellow-400">
+                    <div className="text-sm text-yellow-400 font-bold mb-1">SUBSTITUTION</div>
+                    <div className="font-bold">{liveFplData.ai_report.sub}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

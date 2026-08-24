@@ -36,7 +36,7 @@ export default function TransferRecommender() {
             <span className="font-bold text-green-400 text-sm">Top Buys</span>
           </div>
           <div className="divide-y divide-[var(--border-color)]">
-            {data.buys.map((p, idx) => (
+            {data.buys && data.buys.map((p, idx) => (
               <div key={idx} className="p-3 flex justify-between items-center hover:bg-[var(--bg-primary)]/50 transition-colors">
                 <div>
                   <div className="font-bold text-sm">{p.name}</div>
@@ -58,7 +58,7 @@ export default function TransferRecommender() {
             <span className="font-bold text-red-400 text-sm">Top Sells</span>
           </div>
           <div className="divide-y divide-[var(--border-color)]">
-            {data.sells.map((p, idx) => (
+            {data.sells && data.sells.map((p, idx) => (
               <div key={idx} className="p-3 flex justify-between items-center hover:bg-[var(--bg-primary)]/50 transition-colors">
                 <div>
                   <div className="font-bold text-sm">{p.name}</div>
