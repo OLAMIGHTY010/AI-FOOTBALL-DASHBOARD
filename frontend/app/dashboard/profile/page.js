@@ -15,7 +15,7 @@ import {
 } from "recharts";
 
 export default function ProfilePage() {
-  const { session, aiCoins, addCoins, addToast } = useAppContext();
+  const { user, aiCoins, addCoins, addToast, isLoadingAuth } = useAppContext();
   
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState({ xp: 0, level: 1, username: 'Manager', avatar_url: null });
@@ -37,20 +37,25 @@ export default function ProfilePage() {
   const progressPercent = Math.min(100, Math.max(0, ((profile.xp - xpForCurrent) / (xpForNext - xpForCurrent)) * 100));
 
   useEffect(() => {
-    if (session?.user) {
-      fetchProfileData();
-      checkAndAwardAchievements();
+    if (isLoadingAuth) return;
+    
+    if (user) {
+      Promise.all([fetchProfileData(), checkAndAwardAchievements()]).finally(() => {
+        setLoading(false);
+      });
+    } else {
+      setLoading(false);
     }
-  }, [session]);
+  }, [user, isLoadingAuth]);
 
   const fetchProfileData = async () => {
-    if (!session?.user) return;
+    if (!user) return;
     try {
       // Get profile
       const { data: prof } = await supabase
         .from("profiles")
         .select("*")
-        .eq("id", session.user.id)
+        .eq("id", user.id)
         .single();
         
       if (prof) setProfile(prof);
@@ -59,7 +64,7 @@ export default function ProfilePage() {
       const { data: badges } = await supabase
         .from("user_achievements")
         .select("badge_id, unlocked_at")
-        .eq("user_id", session.user.id);
+        .eq("user_id", user.id);
         
       if (badges) setUnlockedBadges(badges);
     } catch (err) {
@@ -68,7 +73,7 @@ export default function ProfilePage() {
   };
 
   const checkAndAwardAchievements = async () => {
-    if (!session?.user) return;
+    if (!user) return;
     
     // 1. Calculate betting stats from local storage (to check if they meet criteria)
     const settledBets = JSON.parse(localStorage.getItem("settled_bets") || "[]");
@@ -133,7 +138,7 @@ export default function ProfilePage() {
     for (let badgeId of earnedNewBadges) {
       // Check if already unlocked locally to save DB calls
       if (!unlockedBadges.find(b => b.badge_id === badgeId)) {
-        const justUnlocked = await unlockBadge(session.user.id, badgeId);
+        const justUnlocked = await unlockBadge(user.id, badgeId);
         if (justUnlocked) {
           xpToAward += BADGES[badgeId].xp;
           // Optimistically update UI
@@ -143,7 +148,7 @@ export default function ProfilePage() {
     }
 
     if (xpToAward > 0) {
-      const result = await awardXp(session.user.id, profile.xp, profile.level, xpToAward);
+      const result = await awardXp(user.id, profile.xp, profile.level, xpToAward);
       if (result) {
         setProfile(prev => ({ ...prev, xp: result.newXp, level: result.newLevel }));
         if (result.leveledUp) {
@@ -165,7 +170,7 @@ export default function ProfilePage() {
   };
 
   if (loading) return <div className="text-center py-20 font-sans">Loading Profile...</div>;
-  if (!session?.user) return <div className="text-center py-20 font-sans text-red-500">Please sign in to view your profile.</div>;
+  if (!user) return <div className="text-center py-20 font-sans text-red-500">Please sign in to view your profile.</div>;
 
   return (
     <div className="max-w-6xl mx-auto pt-6 pb-20 animate-fade-in font-sans">
