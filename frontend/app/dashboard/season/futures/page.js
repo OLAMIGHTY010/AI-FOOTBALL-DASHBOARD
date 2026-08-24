@@ -44,14 +44,14 @@ export default function SeasonFuturesPage() {
   const maxPossiblePoints = remainingGames * 3;
   const leaderPts = table.length > 0 ? table[0].pts : 0;
 
-  const getWinnerOdds = (team) => {
+  const getWinnerOdds = (team, currentPts) => {
     if (isFinished) return team.id === table[0].id ? 1.0 : 0;
     
     // Base odds derived from team overall rating
     const baseProb = Math.pow(team.ovr / 100, 5); 
     
     // Adjust based on current points deficit
-    const deficit = leaderPts - team.pts;
+    const deficit = leaderPts - currentPts;
     if (deficit > maxPossiblePoints) return 0; // Mathematically eliminated
     
     const deficitPenalty = Math.exp(-deficit / 5);
@@ -138,7 +138,7 @@ export default function SeasonFuturesPage() {
             <div className="divide-y divide-[var(--border-color)] max-h-[600px] overflow-y-auto">
               {table.map((team, idx) => {
                 const rawTeam = league.teams.find(t => t.id === team.id);
-                const odds = getWinnerOdds(rawTeam);
+                const odds = getWinnerOdds(rawTeam, team.pts);
                 
                 if (odds == 0) return null; // Eliminated
 
