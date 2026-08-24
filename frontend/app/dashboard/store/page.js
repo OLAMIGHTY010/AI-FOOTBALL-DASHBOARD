@@ -21,26 +21,15 @@ export default function StorePageWrapper() {
 }
 
 function StorePage() {
-  const { addToast, addCoins } = useAppContext();
+  const { addToast } = useAppContext();
   const searchParams = useSearchParams();
   const [loadingId, setLoadingId] = useState(null);
 
   useEffect(() => {
     if (searchParams.get("success") === "true") {
-      const addedCoins = searchParams.get("added_coins");
+      addToast("Purchase Successful!", "Your AI Coins have been credited to your account.", "success");
       
-      // If we are in sandbox mode, the backend sends the amount to add directly
-      if (addedCoins) {
-        addToast("Purchase Successful!", `You successfully purchased ${parseInt(addedCoins).toLocaleString()} AI Coins.`, "success");
-        // We use a slight delay so the UI can render the toast smoothly
-        setTimeout(() => {
-          addCoins(parseInt(addedCoins));
-        }, 300);
-      } else {
-        addToast("Purchase Successful!", "Your AI Coins will be credited to your account shortly.", "success");
-      }
-      
-      // Clean up the URL to prevent double-crediting on refresh
+      // Clean up the URL to prevent double-toasting on refresh
       window.history.replaceState({}, document.title, window.location.pathname);
       
     } else if (searchParams.get("canceled") === "true") {

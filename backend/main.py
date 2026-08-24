@@ -1236,8 +1236,19 @@ def create_paystack_checkout(req: CheckoutRequest):
 
     if not PAYSTACK_SECRET:
         # SANDBOX MODE: Bypass HTTP request and simulate success
+        # Credit the user directly in the database to avoid frontend race conditions
+        if supabase and coins_to_add > 0:
+            try:
+                wallet_res = supabase.table("profiles").select("bankroll").eq("id", req.user_id).execute()
+                if wallet_res.data:
+                    current_bal = float(wallet_res.data[0].get("bankroll", 0) or 0)
+                    new_bal = current_bal + coins_to_add
+                    supabase.table("profiles").update({"bankroll": new_bal}).eq("id", req.user_id).execute()
+            except Exception as e:
+                print("Sandbox credit error:", e)
+
         return {
-            "authorization_url": f"http://localhost:3000/dashboard/store?success=true&added_coins={coins_to_add}"
+            "authorization_url": f"http://localhost:3000/dashboard/store?success=true"
         }
         
     headers = {
@@ -1265,8 +1276,18 @@ def create_paystack_checkout(req: CheckoutRequest):
             raise HTTPException(status_code=400, detail=res.text)
     except Exception as e:
         # If firewall blocks it even with secret, fallback to sandbox
+        if supabase and coins_to_add > 0:
+            try:
+                wallet_res = supabase.table("profiles").select("bankroll").eq("id", req.user_id).execute()
+                if wallet_res.data:
+                    current_bal = float(wallet_res.data[0].get("bankroll", 0) or 0)
+                    new_bal = current_bal + coins_to_add
+                    supabase.table("profiles").update({"bankroll": new_bal}).eq("id", req.user_id).execute()
+            except Exception as ex:
+                pass
+                
         return {
-            "authorization_url": f"http://localhost:3000/dashboard/store?success=true&added_coins={coins_to_add}"
+            "authorization_url": f"http://localhost:3000/dashboard/store?success=true"
         }
 
 @app.post("/api/webhook/paystack")
