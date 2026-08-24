@@ -990,39 +990,7 @@ def fpl_recommender():
 def get_my_fpl_team(entry_id: int):
     bootstrap = get_fpl_bootstrap()
     if "error" in bootstrap:
-        # Fallback to realistic mock data for sandbox environment where outbound APIs are blocked
-        return {
-            "manager_name": "John Doe",
-            "team_name": "FC Sandbox",
-            "overall_points": 1250,
-            "overall_rank": 450000,
-            "starting_xi": [
-                {"id": 1, "name": "Haaland", "position": 4, "multiplier": 2, "ep_next": 8.5, "now_cost": 14.0, "form": 8.0},
-                {"id": 2, "name": "Salah", "position": 3, "multiplier": 1, "ep_next": 7.2, "now_cost": 12.5, "form": 7.5},
-                {"id": 3, "name": "Saka", "position": 3, "multiplier": 1, "ep_next": 6.5, "now_cost": 8.5, "form": 6.0},
-                {"id": 4, "name": "Watkins", "position": 4, "multiplier": 1, "ep_next": 5.5, "now_cost": 8.0, "form": 5.0},
-                {"id": 5, "name": "Saliba", "position": 2, "multiplier": 1, "ep_next": 4.5, "now_cost": 5.5, "form": 4.0},
-                {"id": 6, "name": "Gabriel", "position": 2, "multiplier": 1, "ep_next": 4.2, "now_cost": 5.0, "form": 4.0},
-                {"id": 7, "name": "Porro", "position": 2, "multiplier": 1, "ep_next": 4.0, "now_cost": 5.5, "form": 3.5},
-                {"id": 8, "name": "Pickford", "position": 1, "multiplier": 1, "ep_next": 3.8, "now_cost": 4.5, "form": 3.0},
-                {"id": 9, "name": "Gordon", "position": 3, "multiplier": 1, "ep_next": 3.5, "now_cost": 6.0, "form": 2.5},
-                {"id": 10, "name": "Bowen", "position": 3, "multiplier": 1, "ep_next": 3.0, "now_cost": 7.0, "form": 2.0},
-                {"id": 11, "name": "Archer", "position": 4, "multiplier": 1, "ep_next": 1.0, "now_cost": 4.5, "form": 0.5}
-            ],
-            "bench": [
-                {"id": 12, "name": "Areola", "position": 1, "multiplier": 0, "ep_next": 3.5, "now_cost": 4.0, "form": 3.0},
-                {"id": 13, "name": "Palmer", "position": 3, "multiplier": 0, "ep_next": 6.8, "now_cost": 5.5, "form": 7.0},
-                {"id": 14, "name": "Taylor", "position": 2, "multiplier": 0, "ep_next": 2.0, "now_cost": 4.0, "form": 1.0},
-                {"id": 15, "name": "Beyer", "position": 2, "multiplier": 0, "ep_next": 1.5, "now_cost": 4.0, "form": 1.0}
-            ],
-            "ai_report": {
-                "rating": 95.5,
-                "prediction": "Top 4.5% Finish",
-                "sell": "Archer",
-                "buy": "Foden",
-                "sub": "Bench Archer and start Palmer."
-            }
-        }
+        return {"error": "Failed to load FPL data. The sandbox firewall is blocking the connection to fantasy.premierleague.com. Please run the project locally on your machine."}
         
     events = bootstrap.get("events", [])
     current_event = None
