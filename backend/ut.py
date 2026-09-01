@@ -32,96 +32,78 @@ PACKS = {
     }
 }
 
-# Player Database
-PLAYERS = {
-    "Bronze": [
-        {"name": "Lamine Yamal", "rating": 64, "position": "FWD"},
-        {"name": "Conor Bradley", "rating": 62, "position": "DEF"},
-        {"name": "Kobie Mainoo", "rating": 64, "position": "MID"},
-        {"name": "Rico Lewis", "rating": 63, "position": "DEF"},
-        {"name": "Lewis Miley", "rating": 61, "position": "MID"},
-        {"name": "Ethan Nwaneri", "rating": 60, "position": "MID"},
-        {"name": "Ben Doak", "rating": 62, "position": "FWD"},
-        {"name": "Jarell Quansah", "rating": 64, "position": "DEF"},
-        {"name": "Oscar Bobb", "rating": 63, "position": "FWD"},
-        {"name": "Stefan Bajcetic", "rating": 64, "position": "MID"},
-        {"name": "Harvey Elliott", "rating": 64, "position": "MID"},
-        {"name": "Caoimhin Kelleher", "rating": 64, "position": "GK"},
-        {"name": "Omari Hutchinson", "rating": 61, "position": "FWD"},
-        {"name": "Shea Charles", "rating": 62, "position": "DEF"},
-        {"name": "James Trafford", "rating": 63, "position": "GK"}
-    ],
-    "Silver": [
-        {"name": "Alejandro Garnacho", "rating": 78, "position": "FWD"},
-        {"name": "Cole Palmer", "rating": 79, "position": "MID"},
-        {"name": "Micky van de Ven", "rating": 79, "position": "DEF"},
-        {"name": "Guglielmo Vicario", "rating": 79, "position": "GK"},
-        {"name": "Leon Bailey", "rating": 77, "position": "FWD"},
-        {"name": "Dominik Szoboszlai", "rating": 79, "position": "MID"},
-        {"name": "Pedro Porro", "rating": 78, "position": "DEF"},
-        {"name": "Evan Ferguson", "rating": 77, "position": "FWD"},
-        {"name": "Anthony Gordon", "rating": 78, "position": "FWD"},
-        {"name": "Jarrad Branthwaite", "rating": 77, "position": "DEF"},
-        {"name": "Sven Botman", "rating": 79, "position": "DEF"},
-        {"name": "Destiny Udogie", "rating": 78, "position": "DEF"},
-        {"name": "Brennan Johnson", "rating": 76, "position": "FWD"},
-        {"name": "Douglas Luiz", "rating": 79, "position": "MID"},
-        {"name": "Lucas Paqueta", "rating": 79, "position": "MID"}
-    ],
-    "Gold": [
-        {"name": "Erling Haaland", "rating": 91, "position": "FWD"},
-        {"name": "Kevin De Bruyne", "rating": 91, "position": "MID"},
-        {"name": "Kylian Mbappe", "rating": 91, "position": "FWD"},
-        {"name": "Rodri", "rating": 90, "position": "MID"},
-        {"name": "Vinicius Jr.", "rating": 89, "position": "FWD"},
-        {"name": "Mohamed Salah", "rating": 89, "position": "FWD"},
-        {"name": "Virgil van Dijk", "rating": 89, "position": "DEF"},
-        {"name": "Alisson", "rating": 89, "position": "GK"},
-        {"name": "Jude Bellingham", "rating": 88, "position": "MID"},
-        {"name": "Harry Kane", "rating": 90, "position": "FWD"},
-        {"name": "Bukayo Saka", "rating": 87, "position": "FWD"},
-        {"name": "Martin Odegaard", "rating": 87, "position": "MID"},
-        {"name": "William Saliba", "rating": 86, "position": "DEF"},
-        {"name": "Son Heung-min", "rating": 87, "position": "FWD"},
-        {"name": "Phil Foden", "rating": 86, "position": "MID"},
-        {"name": "Declan Rice", "rating": 86, "position": "MID"},
-        {"name": "Bernardo Silva", "rating": 88, "position": "MID"},
-        {"name": "Ruben Dias", "rating": 89, "position": "DEF"},
-        {"name": "Thibaut Courtois", "rating": 89, "position": "GK"},
-        {"name": "Lionel Messi", "rating": 90, "position": "FWD"},
-        {"name": "Cristiano Ronaldo", "rating": 86, "position": "FWD"},
-        {"name": "Antoine Griezmann", "rating": 88, "position": "FWD"},
-        {"name": "Robert Lewandowski", "rating": 89, "position": "FWD"},
-        {"name": "Trent Alexander-Arnold", "rating": 86, "position": "DEF"},
-        {"name": "Marc-Andre ter Stegen", "rating": 89, "position": "GK"}
-    ],
-    "Icon": [
-        {"name": "Pele", "rating": 98, "position": "FWD"},
-        {"name": "Diego Maradona", "rating": 97, "position": "MID"},
-        {"name": "Zinedine Zidane", "rating": 96, "position": "MID"},
-        {"name": "Ronaldo Nazario", "rating": 96, "position": "FWD"},
-        {"name": "Johan Cruyff", "rating": 94, "position": "FWD"},
-        {"name": "Paolo Maldini", "rating": 94, "position": "DEF"},
-        {"name": "Lev Yashin", "rating": 94, "position": "GK"},
-        {"name": "Ronaldinho", "rating": 93, "position": "FWD"},
-        {"name": "Thierry Henry", "rating": 93, "position": "FWD"},
-        {"name": "Ruud Gullit", "rating": 93, "position": "MID"},
-        {"name": "Roberto Carlos", "rating": 92, "position": "DEF"},
-        {"name": "Cafu", "rating": 92, "position": "DEF"},
-        {"name": "Patrick Vieira", "rating": 91, "position": "MID"},
-        {"name": "Peter Schmeichel", "rating": 92, "position": "GK"},
-        {"name": "Wayne Rooney", "rating": 90, "position": "FWD"}
-    ]
-}
+from typing import List, Dict, Any
+from fpl import get_fpl_data
+
+def get_real_players() -> Dict[str, List[Dict[str, Any]]]:
+    fpl_players = get_fpl_data()
+    
+    categorized: Dict[str, List[Dict[str, Any]]] = {
+        "Bronze": [],
+        "Silver": [],
+        "Gold": [],
+        "Icon": []
+    }
+    
+    if not fpl_players:
+        return categorized
+
+    # Sort players by expected points to find "Icons"
+    sorted_by_ep = sorted(fpl_players, key=lambda p: p["expected_points"], reverse=True)
+    icons = sorted_by_ep[:15]
+    
+    for p in fpl_players:
+        ut_player = {
+            "name": p["name"],
+            "rating": int(p["expected_points"] * 10 + 30),
+            "position": p["position"],
+            "team": p["team"],
+            "photo": p["photo"],
+            "fpl_price": p["price"]
+        }
+        
+        ut_player["rating"] = min(99, max(40, ut_player["rating"]))
+
+        if p in icons:
+            ut_player["rating"] = max(90, ut_player["rating"])
+            categorized["Icon"].append(ut_player)
+        elif p["price"] >= 8.0:
+            categorized["Gold"].append(ut_player)
+        elif p["price"] >= 5.5:
+            categorized["Silver"].append(ut_player)
+        else:
+            categorized["Bronze"].append(ut_player)
+            
+    # Fallback if pools are empty
+    for rarity in categorized:
+        if not categorized[rarity]:
+            categorized[rarity].append({
+                "name": f"Unknown {rarity}",
+                "rating": 50,
+                "position": "MID",
+                "team": "Unknown",
+                "photo": "https://resources.premierleague.com/premierleague/photos/players/110x140/Photo-Missing.png",
+                "fpl_price": 5.0
+            })
+            
+    return categorized
+
+REAL_PLAYERS_CACHE: Any = None
+
+def get_players_db() -> Dict[str, List[Dict[str, Any]]]:
+    global REAL_PLAYERS_CACHE
+    if REAL_PLAYERS_CACHE is None:
+        REAL_PLAYERS_CACHE = get_real_players()
+    return REAL_PLAYERS_CACHE
 
 def pull_random_player(rarity: str) -> dict:
     """Pulls a random player from the specified rarity pool."""
-    pool = PLAYERS.get(rarity, PLAYERS["Bronze"])
+    db = get_players_db()
+    pool = db.get(rarity, db.get("Bronze", []))
     player = random.choice(pool).copy()
     player["rarity"] = rarity
     player["id"] = f"{player['name'].lower().replace(' ', '_')}_{random.randint(1000, 9999)}"
     player["sell_value"] = get_sell_value(rarity)
-    player["team"] = "Free Agent"
     
     # Generate 6 stats scaled around the player's overall rating
     base = player["rating"]
@@ -153,13 +135,13 @@ def open_pack(pack_name: str) -> list:
 
     # Handle Guarantee
     if pack["guarantee"] != "None":
-        results.append(pull_random_player(pack["guarantee"]))
-        cards_to_pull = pack["cards"] - 1
+        results.append(pull_random_player(str(pack["guarantee"])))
+        cards_to_pull = int(pack["cards"]) - 1
     else:
-        cards_to_pull = pack["cards"]
+        cards_to_pull = int(pack["cards"])
 
     rarities = ["Bronze", "Silver", "Gold", "Icon"]
-    weights = [pack["weights"]["Bronze"], pack["weights"]["Silver"], pack["weights"]["Gold"], pack["weights"]["Icon"]]
+    weights = [float(pack["weights"]["Bronze"]), float(pack["weights"]["Silver"]), float(pack["weights"]["Gold"]), float(pack["weights"]["Icon"])]
 
     for _ in range(cards_to_pull):
         chosen_rarity = random.choices(rarities, weights=weights, k=1)[0]

@@ -43,31 +43,33 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+from typing import List, Optional, Dict, Any
+
 # In-memory state
-standings = {}
+standings: Dict[str, Dict[str, Dict[str, int]]] = {}
 for league, teams in VIRTUAL_TEAMS.items():
     standings[league] = {}
     for team in teams.keys():
         standings[league][team] = {"P": 0, "W": 0, "D": 0, "L": 0, "GF": 0, "GA": 0, "GD": 0, "Pts": 0}
 
-standings_basketball = {}
+standings_basketball: Dict[str, Dict[str, Dict[str, int]]] = {}
 for league, teams in VIRTUAL_BASKETBALL_TEAMS.items():
     standings_basketball[league] = {}
     for team in teams.keys():
         standings_basketball[league][team] = {"P": 0, "W": 0, "L": 0, "PF": 0, "PA": 0, "PD": 0, "Pts": 0}
 
-standings_tennis = {}
+standings_tennis: Dict[str, Dict[str, Dict[str, int]]] = {}
 for league, players in VIRTUAL_TENNIS_PLAYERS.items():
     standings_tennis[league] = {}
     for player in players.keys():
         standings_tennis[league][player] = {"P": 0, "W": 0, "L": 0, "SetsW": 0, "SetsL": 0, "Pts": 0}
 
-standings_racing = {"Global Leaderboard": {}}
+standings_racing: Dict[str, Dict[str, Dict[str, int]]] = {"Global Leaderboard": {}}
 for car in CARS:
-    standings_racing["Global Leaderboard"][car["name"]] = {"P": 0, "W": 0, "Pts": 0}
+    standings_racing["Global Leaderboard"][str(car["name"])] = {"P": 0, "W": 0, "Pts": 0}
 
-current_fixtures = []
-current_racing_fixtures = []
+current_fixtures: List[Dict[str, Any]] = []
+current_racing_fixtures: List[Dict[str, Any]] = []
 
 
 class BetRequest(BaseModel):
@@ -424,7 +426,7 @@ def run_simulation(req: SimulateRequest):
                     try:
                         wallet_res = supabase.table("profiles").select("bankroll").eq("id", bet["user_id"]).execute()
                         if wallet_res.data:
-                            current_bal = float(wallet_res.data[0].get("bankroll", 0) or 0)
+                            current_bal = float(wallet_res.data[0].get("bankroll", 0) or 0)  # type: ignore
                             new_bal = current_bal + bet["potential_payout"]
                             supabase.table("profiles").update({"bankroll": new_bal}).eq("id", bet["user_id"]).execute()
                     except Exception as e:
@@ -448,8 +450,8 @@ def run_simulation(req: SimulateRequest):
 
 
 
-pending_virtual_bets = []
-settled_virtual_bets = []
+pending_virtual_bets: List[Dict[str, Any]] = []
+settled_virtual_bets: List[Dict[str, Any]] = []
 
 @app.post("/api/bet/parlay")
 def place_parlay(req: ParlayRequest):
@@ -473,7 +475,7 @@ def place_parlay(req: ParlayRequest):
         try:
             wallet_res = supabase.table("profiles").select("bankroll").eq("id", req.user_id).execute()
             if wallet_res.data:
-                current_bal = float(wallet_res.data[0].get("bankroll", 0) or 0)
+                current_bal = float(wallet_res.data[0].get("bankroll", 0) or 0)  # type: ignore
                 new_bal = current_bal - req.wager
                 supabase.table("profiles").update({"bankroll": new_bal}).eq("id", req.user_id).execute()
         except Exception as e:
@@ -492,7 +494,7 @@ def place_parlay(req: ParlayRequest):
                 "potential_payout": bet_record["potential_payout"],
                 "legs": bet_record["legs"],
                 "status": bet_record["status"]
-            }).execute()
+            }).execute()  # type: ignore
         except Exception as e:
             print("Error inserting bet into Supabase:", e)
     
@@ -525,7 +527,7 @@ def cashout_bet(req: CashOutRequest):
         try:
             wallet_res = supabase.table("profiles").select("bankroll").eq("id", req.user_id).execute()
             if wallet_res.data:
-                current_bal = float(wallet_res.data[0].get("bankroll", 0) or 0)
+                current_bal = float(wallet_res.data[0].get("bankroll", 0) or 0)  # type: ignore
                 new_bal = current_bal + req.cash_out_amount
                 supabase.table("profiles").update({"bankroll": new_bal}).eq("id", req.user_id).execute()
         except Exception as e:
@@ -549,8 +551,8 @@ def get_bet_history(user_id: str = None):
         try:
             res = supabase.table("virtual_bets").select("*").eq("user_id", user_id).order("created_at", desc=True).execute()
             if res.data:
-                db_pending = [b for b in res.data if b.get("status") == "PENDING"]
-                db_settled = [b for b in res.data if b.get("status") != "PENDING"]
+                db_pending = [b for b in res.data if b.get("status") == "PENDING"]  # type: ignore
+                db_settled = [b for b in res.data if b.get("status") != "PENDING"]  # type: ignore
                 return {"pending": db_pending, "settled": db_settled}
         except Exception as e:
             print("Error fetching bet history from Supabase:", e)
@@ -607,8 +609,15 @@ def recommend_transfer(req: UTRecommendRequest):
     weakest = min(target_players, key=lambda x: x.get("rating", 99))
     target_pos = weakest.get("position")
 
-    global transfer_market_listings
-    # Find affordable upgrades in the market
+    # Fetch affordable upgrades from the market
+    transfer_market_listings: List[Dict[str, Any]] = []
+    if supabase:
+        try:
+            res = supabase.table("transfer_market").select("*").eq("status", "active").execute()
+            transfer_market_listings = list(res.data) if res.data else []  # type: ignore
+        except Exception:
+            pass
+
     upgrades = []
     for listing in transfer_market_listings:
         p = listing["player"]
@@ -647,7 +656,7 @@ def submit_sbc(req: SBCSubmitRequest):
         return {"success": False, "error": f"Squad rating too low (Required: 75+, Provided: {avg_rating:.1f})"}
     
     # Check max players from same club constraint (e.g. max 3)
-    clubs = {}
+    clubs: Dict[str, int] = {}
     for p in req.players:
         team = p.get("team", "Unknown")
         clubs[team] = clubs.get(team, 0) + 1
@@ -837,7 +846,7 @@ def load_tactics(user_id: str):
         return {"error": str(e)}
 
 # --- PvP Multiplayer Endpoints ---
-pvp_lobbies = {}
+pvp_lobbies: dict = {}
 
 class CreateLobbyRequest(BaseModel):
     user_id: str
@@ -970,7 +979,7 @@ def create_league(req: CreateLeagueRequest):
             "admin_team_id": req.admin_team_id,
             "invite_code": invite_code,
             "start_gameweek_id": 1
-        }).execute()
+        }).execute()  # type: ignore
         return {"success": True, "league": data[1][0] if len(data) > 1 and len(data[1]) > 0 else None, "invite_code": invite_code}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -1241,7 +1250,7 @@ def create_paystack_checkout(req: CheckoutRequest):
             try:
                 wallet_res = supabase.table("profiles").select("bankroll").eq("id", req.user_id).execute()
                 if wallet_res.data:
-                    current_bal = float(wallet_res.data[0].get("bankroll", 0) or 0)
+                    current_bal = float(wallet_res.data[0].get("bankroll", 0) or 0)  # type: ignore
                     new_bal = current_bal + coins_to_add
                     supabase.table("profiles").update({"bankroll": new_bal}).eq("id", req.user_id).execute()
             except Exception as e:
@@ -1280,7 +1289,7 @@ def create_paystack_checkout(req: CheckoutRequest):
             try:
                 wallet_res = supabase.table("profiles").select("bankroll").eq("id", req.user_id).execute()
                 if wallet_res.data:
-                    current_bal = float(wallet_res.data[0].get("bankroll", 0) or 0)
+                    current_bal = float(wallet_res.data[0].get("bankroll", 0) or 0)  # type: ignore
                     new_bal = current_bal + coins_to_add
                     supabase.table("profiles").update({"bankroll": new_bal}).eq("id", req.user_id).execute()
             except Exception as ex:
@@ -1327,7 +1336,7 @@ async def paystack_webhook(request: Request, background_tasks: BackgroundTasks):
                         if coins_to_add > 0:
                             wallet_res = supabase.table("profiles").select("bankroll").eq("id", user_id).execute()
                             if wallet_res.data:
-                                current_bal = float(wallet_res.data[0].get("bankroll", 0) or 0)
+                                current_bal = float(wallet_res.data[0].get("bankroll", 0) or 0)  # type: ignore
                                 new_bal = current_bal + coins_to_add
                                 supabase.table("profiles").update({"bankroll": new_bal}).eq("id", user_id).execute()
                 except Exception as e:

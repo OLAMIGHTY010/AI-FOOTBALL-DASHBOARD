@@ -19,8 +19,7 @@ UEFA_CLUBS = {
     "uecl": [("Chelsea", 49), ("Fiorentina", 502), ("Real Betis", 543), ("Heidenheim", 73), ("Heart Of Midlothian", 254), ("Larne", 5354), ("Shamrock Rovers", 652), ("Molde", 329)]
 }
 
-# Pre-generate mock players to keep them consistent across requests
-MOCK_UEFA_PLAYERS = {"ucl": [], "uel": [], "uecl": []}
+# MOCK_UEFA_PLAYERS has been removed; only live data is supported.
 TEAMS_CACHE_FILE = "cache_uefa_teams.json"
 
 def fetch_uefa_teams_from_api(season=2024):
@@ -68,34 +67,7 @@ def fetch_uefa_teams_from_api(season=2024):
 # Try fetching dynamic teams before generating players
 fetch_uefa_teams_from_api()
 
-def _generate_mock_players():
-    pos_map = {1: "GK", 2: "DEF", 3: "MID", 4: "FWD"}
-    first_names = ["L.", "J.", "M.", "K.", "A.", "E.", "D.", "C.", "R.", "V."]
-    last_names = ["Silva", "Martinez", "Mbappe", "Kane", "Saka", "Bellingham", "Vinicius", "Rodri", "Wirtz", "Musiala"]
 
-    for comp, clubs in UEFA_CLUBS.items():
-        for team_idx, team in enumerate(clubs):
-            # Generate exactly 2 GKs, 5 DEFs, 5 MIDs, 3 FWDs per team (15 players)
-            squad_positions = ["GK"]*2 + ["DEF"]*5 + ["MID"]*5 + ["FWD"]*3
-            for p_idx, pos in enumerate(squad_positions):
-                price = round(random.uniform(4.0, 12.0) if pos in ["MID", "FWD"] else random.uniform(4.0, 7.0), 1)
-                expected_points = round(price * 1.5 + random.uniform(-2, 4), 1)
-                
-                MOCK_UEFA_PLAYERS[comp].append({
-                    "id": f"{comp}_{team_idx}_{p_idx}",
-                    "name": f"{random.choice(first_names)} {random.choice(last_names)}",
-                    "team_id": team_idx,
-                    "team": team[0],
-                    "position": pos,
-                    "price": price,
-                    "expected_points": max(1.0, expected_points),
-                    "live_points": int(max(0, expected_points + random.uniform(-3, 5))),
-                    "form": str(round(random.uniform(2.0, 8.0), 1)),
-                    "selected_by": str(round(random.uniform(0.1, 40.0), 1)),
-                    "photo": "https://resources.premierleague.com/premierleague/photos/players/110x140/Photo-Missing.png",
-                })
-
-_generate_mock_players()
 
 def fetch_real_squads_from_api():
     if os.path.exists(CACHE_FILE):
@@ -171,11 +143,11 @@ def fetch_real_squads_from_api():
     return None
 
 def get_uefa_data(competition: str) -> List[Dict[str, Any]]:
-    """Returns real UEFA Fantasy data if available, otherwise mock data."""
+    """Returns real UEFA Fantasy data if available, otherwise empty list."""
     real_data = fetch_real_squads_from_api()
     if real_data and real_data.get(competition):
         return real_data[competition]
-    return MOCK_UEFA_PLAYERS.get(competition, [])
+    return []
 
 def optimize_uefa_squad(competition: str, budget: float = 100.0, max_per_team: int = 3, formation: str = "3-4-3") -> Dict[str, Any]:
     """
@@ -214,7 +186,7 @@ def optimize_uefa_squad(competition: str, budget: float = 100.0, max_per_team: i
         sorted_players = sorted(players, key=lambda p: p["expected_points"] / p["price"], reverse=True)
         counts = {"GK": 0, "DEF": 0, "MID": 0, "FWD": 0}
         limits = {"GK": 2, "DEF": 5, "MID": 5, "FWD": 3}
-        team_counts = {}
+        team_counts: dict = {}
         curr_price = 0.0
 
         for p in sorted_players:

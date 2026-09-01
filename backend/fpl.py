@@ -41,8 +41,8 @@ def get_fpl_data() -> List[Dict[str, Any]]:
                     }
                 )
             
-            # Take the top 200 players by expected points to ensure the PuLP solver is fast
-            return sorted(players, key=lambda x: x["expected_points"], reverse=True)[:200]
+            # Return all active players
+            return players
     except Exception as e:
         print("Error fetching FPL data:", e)
         
@@ -62,6 +62,9 @@ def optimize_fpl_squad(budget: float = 100.0, max_per_team: int = 3, formation: 
     
     if not players:
         return {"error": "Failed to fetch players"}
+        
+    # Take the top 200 players by expected points to ensure the PuLP solver is fast
+    players = sorted(players, key=lambda x: x["expected_points"], reverse=True)[:200]
 
     # Set up PuLP problem
     prob = pulp.LpProblem("FPL_Squad_Optimization", pulp.LpMaximize)
@@ -103,7 +106,7 @@ def optimize_fpl_squad(budget: float = 100.0, max_per_team: int = 3, formation: 
         sorted_players = sorted(players, key=lambda p: p["expected_points"] / p["price"], reverse=True)
         counts = {"GK": 0, "DEF": 0, "MID": 0, "FWD": 0}
         limits = {"GK": 2, "DEF": 5, "MID": 5, "FWD": 3}
-        team_counts = {}
+        team_counts: dict = {}
         curr_price = 0.0
 
         for p in sorted_players:
