@@ -1,6 +1,50 @@
+# Virtual environments
 venv/
-venv/
+.venv/
+
+# Python
 *.pyc
 __pycache__/
+*.egg-info/
+dist/
+build/
+
+# Environment variables (NEVER commit secrets)
+.env
+.env.local
+.env.*.local
+*.env
+
+# Node
+node_modules/
+.next/
+.swc/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Logs
+*.log
 backend.log
 frontend.log
+
+# Cache files
+*.orig
+cache_*.json
+.pytest_cache/
+.mypy_cache/
+
+# Debug artifacts
+debug_*.html
+mypy_errors.txt
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Playwright
+playwright-report/
+test-results/

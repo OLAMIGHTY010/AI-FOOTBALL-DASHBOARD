@@ -19,7 +19,7 @@ export function QuickStatsWidget({ bankroll, loginStreak, wins, losses }) {
       <div className="grid grid-cols-2 gap-3">
         <div className="bg-[var(--bg-secondary)] p-3 rounded-lg text-center shadow-inner">
           <div className="text-xs text-[var(--text-secondary)]">Bankroll</div>
-          <div className="text-xl font-black text-yellow-400 font-mono">£{bankroll?.toFixed(0) || 0}</div>
+          <div className="text-xl font-black text-yellow-400 font-mono">₦{bankroll?.toFixed(0) || 0}</div>
         </div>
         <div className="bg-[var(--bg-secondary)] p-3 rounded-lg text-center shadow-inner">
           <div className="text-xs text-[var(--text-secondary)]">Login Streak</div>
@@ -76,7 +76,7 @@ export function RecentBetsWidget({ recentBets }) {
               <span className={`font-bold ${bet.status === "WON" ? "text-green-400" : bet.status === "LOST" ? "text-red-400" : "text-yellow-400"}`}>
                 {bet.status}
               </span>
-              <span className="text-[var(--text-secondary)] font-mono">£{bet.wager} → <span className="text-white">£{bet.potentialWin || bet.potential_payout || bet.wager}</span></span>
+              <span className="text-[var(--text-secondary)] font-mono">₦{bet.wager} → <span className="text-white">₦{bet.potentialWin || bet.potential_payout || bet.wager}</span></span>
             </div>
           ))}
         </div>

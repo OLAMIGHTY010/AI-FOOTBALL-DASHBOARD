@@ -13,13 +13,19 @@ export const metadata = {
   title: "AI Football Dashboard",
   description: "Real-money sports betting, FPL, and Ultimate Team platform",
   manifest: "/manifest.json",
-  themeColor: "#00ff87",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
     title: "AI Football",
   },
-  viewport: "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0",
+};
+
+export const viewport = {
+  themeColor: "#00ff87",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
 };
 
 export default function RootLayout({ children }) {

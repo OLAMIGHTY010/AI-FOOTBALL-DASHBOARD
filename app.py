@@ -1,5 +1,4 @@
 import streamlit as st
-import pandas as st_pd
 import pandas as pd
 import json
 import random
@@ -34,6 +33,12 @@ import tactics
 
 st.set_page_config(
     page_title="Player Dashboard", layout="wide", initial_sidebar_state="expanded"
+)
+
+st.warning(
+    "⚠️ **DEPRECATION NOTICE**: This Streamlit frontend is legacy and will be deprecated soon. "
+    "Please use the primary **Next.js frontend** (`cd frontend && npm run dev`) for the full feature set "
+    "including Responsible Gambling tools, Global Chat, and better performance."
 )
 
 if "user" not in st.session_state:
@@ -289,7 +294,8 @@ def fetch_live_team_data(team_id):
         "x-rapidapi-host": "v3.football.api-sports.io",
         "x-rapidapi-key": API_KEY,
     }
-    params = {"team": team_id, "season": "2023", "page": 1}
+    current_season = str(datetime.date.today().year - 1)  # API uses start year of season
+    params = {"team": team_id, "season": current_season, "page": 1}
 
     players_data = []
 
@@ -871,7 +877,7 @@ def render_pitch(team_df, formation):
     for idx, row in team_df.iterrows():
         pos = positions[idx] if idx < len(positions) else {"top": 50, "left": "50%"}
         photo = (
-            row["photo"] if pd.notna(row["photo"]) else "https://via.placeholder.com/50"
+            row["photo"] if pd.notna(row["photo"]) else "https://placehold.co/50x50/333/fff?text=?"
         )
         name = row["name"]
         f_pos = row["position"]
@@ -1105,7 +1111,7 @@ if page == "Player Browser (Compare)":
                     (
                         player["photo"]
                         if pd.notna(player["photo"])
-                        else "https://via.placeholder.com/150"
+                        else "https://placehold.co/150x150/333/fff?text=?"
                     ),
                     width=120,
                 )

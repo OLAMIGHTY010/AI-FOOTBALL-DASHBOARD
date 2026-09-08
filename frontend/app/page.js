@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import IntroSequence from "./components/IntroSequence";
 
 const COUNTRIES = [
   "United States", "United Kingdom", "Nigeria", "Ghana",
@@ -20,8 +21,19 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
+  
+  // FTUE State
+  const [hasSeenIntro, setHasSeenIntro] = useState(true);
 
   useEffect(() => {
+    // Check local storage for intro flag
+    if (typeof window !== "undefined") {
+      const introFlag = localStorage.getItem("hasSeenIntro");
+      if (!introFlag) {
+        setHasSeenIntro(false);
+      }
+    }
+
     // Check if user is already logged in
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -114,6 +126,15 @@ export default function LoginPage() {
       setError(error.message);
     }
   };
+
+  if (!hasSeenIntro) {
+    return <IntroSequence onComplete={() => {
+      if (typeof window !== "undefined") {
+        localStorage.setItem("hasSeenIntro", "true");
+      }
+      setHasSeenIntro(true);
+    }} />;
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4"

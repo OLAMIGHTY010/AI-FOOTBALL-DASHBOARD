@@ -2,12 +2,11 @@
 > frontend@0.1.0 dev
 > next dev
 
-⚠ Port 3000 is in use by an unknown process, using available port 3001 instead.
 ▲ Next.js 16.2.12 (Turbopack)
-- Local:         http://localhost:3001
-- Network:       http://10.20.223.191:3001
+- Local:         http://localhost:3000
+- Network:       http://192.168.100.59:3000
 - Environments: .env.local
-✓ Ready in 1083ms
+✓ Ready in 1105ms
 ⚠ Warning: Next.js inferred your workspace root, but it may not be correct.
  We detected multiple lockfiles and selected the directory of /home/gamp/package-lock.json as the root directory.
  To silence this warning, set `turbopack.root` in your Next.js config, or consider removing one of the lockfiles if it's not needed.
@@ -15,12 +14,380 @@
  Detected additional lockfiles: 
    * /home/gamp/Desktop/AI-FOOTBALL-DASHBOARD/frontend/package-lock.json
 
-⨯ Another next dev server is already running.
 
-- Local:        http://localhost:3000
-- PID:          7916
-- Dir:          /home/gamp/Desktop/AI-FOOTBALL-DASHBOARD/frontend
-- Log:          .next/dev/logs/next-development.log
 
-Run kill 7916 to stop it.
-[?25h
+-----
+[1m[31mFATAL[39m[0m: An unexpected Turbopack error occurred. A panic log has been written to /tmp/next-panic-55ba6f6116be3f8ca746edcf9c99d49e.log.
+
+To help make Turbopack better, report this error by clicking here: https://bugs.nextjs.org/search?category=turbopack-error-report&title=Turbopack%20Error%3A%20failed%20to%20write%20to%20%22%2Fhome%2Fgamp%2FDesktop%2FAI-FOOTBALL-DASHBOARD%2Ffrontend%2F.next%2Fdev%2Fserver%2Fapp%2Fpage_client-reference-manifest.js%22&body=Turbopack%20version%3A%20%60v16.2.12%60%0ANext.js%20version%3A%20%600.0.0%60%0A%0AError%20message%3A%0A%60%60%60%0Afailed%20to%20write%20to%20%22%2Fhome%2Fgamp%2FDesktop%2FAI-FOOTBALL-DASHBOARD%2Ffrontend%2F.next%2Fdev%2Fserver%2Fapp%2Fpage_client-reference-manifest.js%22%0A%0ACaused%20by%3A%0A-%20No%20space%20left%20on%20device%20%28os%20error%2028%29%0A%60%60%60&labels=Turbopack,Turbopack%20Panic%20Backtrace
+-----
+
+
+-----
+[1m[31mFATAL[39m[0m: An unexpected Turbopack error occurred. A panic log has been written to /tmp/next-panic-55ba6f6116be3f8ca746edcf9c99d49e.log.
+
+To help make Turbopack better, report this error by clicking here: https://bugs.nextjs.org/search?category=turbopack-error-report&title=Turbopack%20Error%3A%20failed%20to%20write%20to%20%22%2Fhome%2Fgamp%2FDesktop%2FAI-FOOTBALL-DASHBOARD%2Ffrontend%2F.next%2Fdev%2Fserver%2Fapp%2Fpage_client-reference-manifest.js%22&body=Turbopack%20version%3A%20%60v16.2.12%60%0ANext.js%20version%3A%20%600.0.0%60%0A%0AError%20message%3A%0A%60%60%60%0Afailed%20to%20write%20to%20%22%2Fhome%2Fgamp%2FDesktop%2FAI-FOOTBALL-DASHBOARD%2Ffrontend%2F.next%2Fdev%2Fserver%2Fapp%2Fpage_client-reference-manifest.js%22%0A%0ACaused%20by%3A%0A-%20No%20space%20left%20on%20device%20%28os%20error%2028%29%0A%60%60%60&labels=Turbopack,Turbopack%20Panic%20Backtrace
+-----
+
+
+-----
+[1m[31mFATAL[39m[0m: An unexpected Turbopack error occurred. A panic log has been written to /tmp/next-panic-55ba6f6116be3f8ca746edcf9c99d49e.log.
+
+To help make Turbopack better, report this error by clicking here: https://bugs.nextjs.org/search?category=turbopack-error-report&title=Turbopack%20Error%3A%20failed%20to%20write%20to%20%22%2Fhome%2Fgamp%2FDesktop%2FAI-FOOTBALL-DASHBOARD%2Ffrontend%2F.next%2Fdev%2Fserver%2Fapp%2Fpage_client-reference-manifest.js%22&body=Turbopack%20version%3A%20%60v16.2.12%60%0ANext.js%20version%3A%20%600.0.0%60%0A%0AError%20message%3A%0A%60%60%60%0Afailed%20to%20write%20to%20%22%2Fhome%2Fgamp%2FDesktop%2FAI-FOOTBALL-DASHBOARD%2Ffrontend%2F.next%2Fdev%2Fserver%2Fapp%2Fpage_client-reference-manifest.js%22%0A%0ACaused%20by%3A%0A-%20No%20space%20left%20on%20device%20%28os%20error%2028%29%0A%60%60%60&labels=Turbopack,Turbopack%20Panic%20Backtrace
+-----
+
+
+-----
+[1m[31mFATAL[39m[0m: An unexpected Turbopack error occurred. A panic log has been written to /tmp/next-panic-55ba6f6116be3f8ca746edcf9c99d49e.log.
+
+To help make Turbopack better, report this error by clicking here: https://bugs.nextjs.org/search?category=turbopack-error-report&title=Turbopack%20Error%3A%20failed%20to%20write%20to%20%22%2Fhome%2Fgamp%2FDesktop%2FAI-FOOTBALL-DASHBOARD%2Ffrontend%2F.next%2Fdev%2Fserver%2Fapp%2Fpage_client-reference-manifest.js%22&body=Turbopack%20version%3A%20%60v16.2.12%60%0ANext.js%20version%3A%20%600.0.0%60%0A%0AError%20message%3A%0A%60%60%60%0Afailed%20to%20write%20to%20%22%2Fhome%2Fgamp%2F
+thread 'tokio-runtime-worker' (76591) panicked at crates/next-napi-bindings/src/next_api/turbopack_ctx.rs:323:51:
+called `Result::unwrap()` on an `Err` value: PoisonError { .. }
+
+thread 'tokio-runtime-worker' (77316) panicked at crates/next-napi-bindings/src/next_api/turbopack_ctx.rs:323:51:
+called `Result::unwrap()` on an `Err` value: PoisonError { .. }
+
+thread 'tokio-runtime-worker' (77316) panicked at crates/next-napi-bindings/src/next_api/turbopack_ctx.rs:323:51:
+called `Result::unwrap()` on an `Err` value: PoisonError { .. }
+
+thread 'tokio-runtime-worker' (77316) panicked at crates/next-napi-bindings/src/next_api/turbopack_ctx.rs:323:51:
+called `Result::unwrap()` on an `Err` value: PoisonError { .. }
+
+thread 'tokio-runtime-worker' (77316) panicked at crates/next-napi-bindings/src/next_api/turbopack_ctx.rs:323:51:
+called `Result::unwrap()` on an `Err` value: PoisonError { .. }
+
+thread 'tokio-runtime-worker' (76591) panicked at crates/next-napi-bindings/src/next_api/turbopack_ctx.rs:323:51:
+called `Result::unwrap()` on an `Err` value: PoisonError { .. }
+
+thread 'tokio-runtime-worker' (77316) panicked at crates/next-napi-bindings/src/next_api/turbopack_ctx.rs:323:51:
+called `Result::unwrap()` on an `Err` value: PoisonError { .. }
+
+thread 'tokio-runtime-worker' (76591) panicked at crates/next-napi-bindings/src/next_api/turbopack_ctx.rs:323:51:
+called `Result::unwrap()` on an `Err` value: PoisonError { .. }
+
+thread 'tokio-runtime-worker' (77316) panicked at crates/next-napi-bindings/src/next_api/turbopack_ctx.rs:323:51:
+called `Result::unwrap()` on an `Err` value: PoisonError { .. }
+
+thread 'tokio-runtime-worker' (76591) panicked at crates/next-napi-bindings/src/next_api/turbopack_ctx.rs:323:51:
+called `Result::unwrap()` on an `Err` value: PoisonError { .. }
+
+thread 'tokio-runtime-worker' (77316) panicked at crates/next-napi-bindings/src/next_api/turbopack_ctx.rs:323:51:
+called `Result::unwrap()` on an `Err` value: PoisonError { .. }
+
+thread 'tokio-runtime-worker' (76591) panicked at crates/next-napi-bindings/src/next_api/turbopack_ctx.rs:323:51:
+called `Result::unwrap()` on an `Err` value: PoisonError { .. }
+
+thread 'tokio-runtime-worker' (77316) panicked at crates/next-napi-bindings/src/next_api/turbopack_ctx.rs:323:51:
+called `Result::unwrap()` on an `Err` value: PoisonError { .. }
+
+thread 'tokio-runtime-worker' (76591) panicked at crates/next-napi-bindings/src/next_api/turbopack_ctx.rs:323:51:
+called `Result::unwrap()` on an `Err` value: PoisonError { .. }
+
+thread 'tokio-runtime-worker' (77316) panicked at crates/next-napi-bindings/src/next_api/turbopack_ctx.rs:323:51:
+called `Result::unwrap()` on an `Err` value: PoisonError { .. }
+
+thread 'tokio-runtime-worker' (77315) panicked at crates/next-napi-bindings/src/next_api/turbopack_ctx.rs:323:51:
+called `Result::unwrap()` on an `Err` value: PoisonError { .. }
+
+thread 'tokio-runtime-worker' (77316) panicked at crates/next-napi-bindings/src/next_api/turbopack_ctx.rs:323:51:
+called `Result::unwrap()` on an `Err` value: PoisonError { .. }
+
+thread 'tokio-runtime-worker' (77316) panicked at crates/next-napi-bindings/src/next_api/turbopack_ctx.rs:323:51:
+called `Result::unwrap()` on an `Err` value: PoisonError { .. }
+
+thread 'tokio-runtime-worker' (77316) panicked at crates/next-napi-bindings/src/next_api/turbopack_ctx.rs:323:51:
+called `Result::unwrap()` on an `Err` value: PoisonError { .. }
+
+thread 'tokio-runtime-worker' (77828) panicked at crates/next-napi-bindings/src/next_api/turbopack_ctx.rs:323:51:
+called `Result::unwrap()` on an `Err` value: PoisonError { .. }
+
+thread 'tokio-runtime-worker' (76591) panicked at crates/next-napi-bindings/src/next_api/turbopack_ctx.rs:323:51:
+called `Result::unwrap()` on an `Err` value: PoisonError { .. }
+
+thread 'tokio-runtime-worker' (77828) panicked at crates/next-napi-bindings/src/next_api/turbopack_ctx.rs:323:51:
+called `Result::unwrap()` on an `Err` value: PoisonError { .. }
+
+thread 'tokio-runtime-worker' (77316) panicked at crates/next-napi-bindings/src/next_api/turbopack_ctx.rs:323:51:
+called `Result::unwrap()` on an `Err` value
+thread 'tokio-runtime-worker' (76591) panicked at crates/next-napi-bindings/src/next_api/turbopack_ctx.rs:323:51:
+called `Result::unwrap()` on an `Err` value: PoisonError { .. }
+
+thread 'tokio-runtime-worker' (77315) panicked at crates/next-napi-bindings/src/next_api/turbopack_ctx.rs:323:51:
+called `Result::unwrap()` on an `Err` value: PoisonError { .. }
+
+thread 'tokio-runtime-worker' (76591) panicked at crates/next-napi-bindings/src/next_api/turbopack_ctx.rs:323:51:
+called `Result::unwrap()` on an `Err` value: PoisonError { .. }
+
+thread 'tokio-runtime-worker' (76591) panicked at crates/next-napi-bindings/src/next_api/turbopack_ctx.rs:323:51:
+called `Result::unwrap()` on an `Err` value: PoisonError { .. }
+
+thread 'tokio-runtime-worker' (77316) panicked at crates/next-napi-bindings/src/next_api/turbopack_ctx.rs:323:51:
+called `Result::unwrap()` on an `Err` value: PoisonError { .. }
+
+thread 'tokio-runtime-worker' (77315) panicked at crates/next-napi-bindings/src/next_api/turbopack_ctx.rs:323:51:
+called `Result::unwrap()` on an `Err` value: PoisonError { .. }
+
+thread 'tokio-runtime-worker' (76591) panicked at crates/next-napi-bindings/src/next_api/turbopack_ctx.rs:323:51:
+called `Result::unwrap()` on an `Err` value: PoisonError { .. }
+
+thread 'tokio-runtime-worker' (76591) panicked at crates/next-napi-bindings/src/next_api/turbopack_ctx.rs:323:51:
+called `Result::unwrap()` on an `Err` value: PoisonError { .. }
+
+thread 'tokio-runtime-worker' (76591) panicked at crates/next-napi-bindings/src/next_api/turbopack_ctx.rs:323:51:
+called `Result::unwrap()` on an `Err` value: PoisonError { .. }
+
+thread 'tokio-runtime-worker' (77316) panicked at crates/next-napi-bindings/src/next_api/turbopack_ctx.rs:323:51:
+called `Result::unwrap()` on an `Err` value: PoisonError { .. }
+
+thread 'tokio-runtime-worker' (77316) panicked at crates/next-napi-bindings/src/next_api/turbopack_ctx.rs:323:51:
+called `Result::unwrap()` on an `Err` value: PoisonError { .. }
+
+thread 'tokio-runtime-worker' (76591) panicked at crates/next-napi-bindings/src/next_api/turbopack_ctx.rs:323:51:
+called `Result::unwrap()` on an `Err` value: PoisonError { .. }
+
+thread 'tokio-runtime-worker' (77315) panicked at crates/next-napi-bindings/src/next_api/turbopack_ctx.rs:323:51:
+called `Result::unwrap()` on an `Err` value: PoisonError { .. }
+Error: ENOSPC: no space left on device, write
+    at ignore-listed frames {
+  errno: -28,
+  syscall: 'write',
+  code: 'ENOSPC'
+}
+⨯ uncaughtException: Error: ENOSPC: no space left on device, write
+    at ignore-listed frames {
+  errno: -28,
+  syscall: 'write',
+  code: 'ENOSPC'
+}
+⨯ uncaughtException:  Error: ENOSPC: no space left on device, write
+    at ignore-listed frames {
+  errno: -28,
+  syscall: 'write',
+  code: 'ENOSPC'
+}
+[Server HMR] Subscription error: Error [TurbopackInternalError]: failed to write to "/home/gamp/Desktop/AI-FOOTBALL-DASHBOARD/frontend/.next/dev/server/app/dashboard/page_client-reference-manifest.js"
+
+Caused by:
+- No space left on device (os error 28)
+    at <unknown> (TurbopackInternalError: failed to write to "/home/gamp/Desktop/AI-FOOTBALL-DASHBOARD/frontend/.next/dev/server/app/dashboard/page_client-reference-manifest.js") {
+  location: undefined
+}
+Persisting failed: Unable to write SST file 00006003.sst
+
+Caused by:
+    0: Failed to write value block
+    1: Failed to write block data
+    2: No space left on device (os error 28)
+[Server HMR] Subscription error: Error [TurbopackInternalError]: failed to write to "/home/gamp/Desktop/AI-FOOTBALL-DASHBOARD/frontend/.next/dev/server/app/page_client-reference-manifest.js"
+
+Caused by:
+- No space left on device (os error 28)
+    at <unknown> (TurbopackInternalError: failed to write to "/home/gamp/Desktop/AI-FOOTBALL-DASHBOARD/frontend/.next/dev/server/app/page_client-reference-manifest.js") {
+  location: undefined
+}
+Persisting failed: Another write batch or compaction is already active (Only a single write operations is allowed at a time)
+[Server HMR] Subscription error: Error [TurbopackInternalError]: failed to write to "/home/gamp/Desktop/AI-FOOTBALL-DASHBOARD/frontend/.next/dev/server/app/page_client-reference-manifest.js"
+
+Caused by:
+- No space left on device (os error 28)
+    at <unknown> (TurbopackInternalError: failed to write to "/home/gamp/Desktop/AI-FOOTBALL-DASHBOARD/frontend/.next/dev/server/app/page_client-reference-manifest.js") {
+  location: undefined
+}
+[Server HMR] Subscription error: Error [TurbopackInternalError]: failed to write to "/home/gamp/Desktop/AI-FOOTBALL-DASHBOARD/frontend/.next/dev/server/app/page_client-reference-manifest.js"
+
+Caused by:
+- No space left on device (os error 28)
+    at <unknown> (TurbopackInternalError: failed to write to "/home/gamp/Desktop/AI-FOOTBALL-DASHBOARD/frontend/.next/dev/server/app/page_client-reference-manifest.js") {
+  location: undefined
+}
+[Server HMR] Subscription error: Error [TurbopackInternalError]: failed to write to "/home/gamp/Desktop/AI-FOOTBALL-DASHBOARD/frontend/.next/dev/server/app/dashboard/page_client-reference-manifest.js"
+
+Caused by:
+- No space left on device (os error 28)
+    at <unknown> (TurbopackInternalError: failed to write to "/home/gamp/Desktop/AI-FOOTBALL-DASHBOARD/frontend/.next/dev/server/app/dashboard/page_client-reference-manifest.js") {
+  location: undefined
+}
+[Server HMR] Subscription error: Error [TurbopackInternalError]: failed to write to "/home/gamp/Desktop/AI-FOOTBALL-DASHBOARD/frontend/.next/dev/server/app/dashboard/page_client-reference-manifest.js"
+
+Caused by:
+- No space left on device (os error 28)
+    at <unknown> (TurbopackInternalError: failed to write to "/home/gamp/Desktop/AI-FOOTBALL-DASHBOARD/frontend/.next/dev/server/app/dashboard/page_client-reference-manifest.js") {
+  location: undefined
+}
+[Server HMR] Subscription error: Error [TurbopackInternalError]: failed to write to "/home/gamp/Desktop/AI-FOOTBALL-DASHBOARD/frontend/.next/dev/server/app/page_client-reference-manifest.js"
+
+Caused by:
+- No space left on device (os error 28)
+    at <unknown> (TurbopackInternalError: failed to write to "/home/gamp/Desktop/AI-FOOTBALL-DASHBOARD/frontend/.next/dev/server/app/page_client-reference-manifest.js") {
+  location: undefined
+}
+[Server HMR] Subscription error: Error [TurbopackInternalError]: failed to write to "/home/gamp/Desktop/AI-FOOTBALL-DASHBOARD/frontend/.next/dev/server/app/page_client-reference-manifest.js"
+
+Caused by:
+- No space left on device (os error 28)
+    at <unknown> (TurbopackInternalError: failed to write to "/home/gamp/Desktop/AI-FOOTBALL-DASHBOARD/frontend/.next/dev/server/app/page_client-reference-manifest.js") {
+  location: undefined
+}
+[Server HMR] Subscription error: Error [TurbopackInternalError]: failed to write to "/home/gamp/Desktop/AI-FOOTBALL-DASHBOARD/frontend/.next/dev/server/app/page_client-reference-manifest.js"
+
+Caused by:
+- No space left on device (os error 28)
+    at <unknown> (TurbopackInternalError: failed to write to "/home/gamp/Desktop/AI-FOOTBALL-DASHBOARD/frontend/.next/dev/server/app/page_client-reference-manifest.js") {
+  location: undefined
+}
+[Server HMR] Subscription error: Error [TurbopackInternalError]: failed to write to "/home/gamp/Desktop/AI-FOOTBALL-DASHBOARD/frontend/.next/dev/server/app/dashboard/page_client-reference-manifest.js"
+
+Caused by:
+- No space left on device (os error 28)
+    at <unknown> (TurbopackInternalError: failed to write to "/home/gamp/Desktop/AI-FOOTBALL-DASHBOARD/frontend/.next/dev/server/app/dashboard/page_client-reference-manifest.js") {
+  location: undefined
+}
+[Server HMR] Subscription error: Error [TurbopackInternalError]: failed to write to "/home/gamp/Desktop/AI-FOOTBALL-DASHBOARD/frontend/.next/dev/server/app/dashboard/page_client-reference-manifest.js"
+
+Caused by:
+- No space left on device (os error 28)
+    at <unknown> (TurbopackInternalError: failed to write to "/home/gamp/Desktop/AI-FOOTBALL-DASHBOARD/frontend/.next/dev/server/app/dashboard/page_client-reference-manifest.js") {
+  location: undefined
+}
+[Server HMR] Subscription error: Error [TurbopackInternalError]: failed to write to "/home/gamp/Desktop/AI-FOOTBALL-DASHBOARD/frontend/.next/dev/server/app/page_client-reference-manifest.js"
+
+Caused by:
+- No space left on device (os error 28)
+    at <unknown> (TurbopackInternalError: failed to write to "/home/gamp/Desktop/AI-FOOTBALL-DASHBOARD/frontend/.next/dev/server/app/page_client-reference-manifest.js") {
+  location: undefined
+}
+[Server HMR] Subscription error: Error [TurbopackInternalError]: failed to write to "/home/gamp/Desktop/AI-FOOTBALL-DASHBOARD/frontend/.next/dev/server/app/page_client-reference-manifest.js"
+
+Caused by:
+- No space left on device (os error 28)
+    at <unknown> (TurbopackInternalError: failed to write to "/home/gamp/Desktop/AI-FOOTBALL-DASHBOARD/frontend/.next/dev/server/app/page_client-reference-manifest.js") {
+  location: undefined
+}
+[Server HMR] Subscription error: Error [TurbopackInternalError]: failed to write to "/home/gamp/Desktop/AI-FOOTBALL-DASHBOARD/frontend/.next/dev/server/app/page_client-reference-manifest.js"
+
+Caused by:
+- No space left on device (os error 28)
+    at <unknown> (TurbopackInternalError: failed to write to "/home/gamp/Desktop/AI-FOOTBALL-DASHBOARD/frontend/.next/dev/server/app/page_client-reference-manifest.js") {
+  location: undefined
+}
+[Server HMR] Subscription error: Error [TurbopackInternalError]: failed to write to "/home/gamp/Desktop/AI-FOOTBALL-DASHBOARD/frontend/.next/dev/server/app/page_client-reference-manifest.js"
+
+Caused by:
+- No space left on device (os error 28)
+    at <unknown> (TurbopackInternalError: failed to write to "/home/gamp/Desktop/AI-FOOTBALL-DASHBOARD/frontend/.next/dev/server/app/page_client-reference-manifest.js") {
+  location: undefined
+}
+[Server HMR] Subscription error: Error [TurbopackInternalError]: failed to write to "/home/gamp/Desktop/AI-FOOTBALL-DASHBOARD/frontend/.next/dev/server/app/dashboard/page_client-reference-manifest.js"
+
+Caused by:
+- No space left on device (os error 28)
+    at <unknown> (TurbopackInternalError: failed to write to "/home/gamp/Desktop/AI-FOOTBALL-DASHBOARD/frontend/.next/dev/server/app/dashboard/page_client-reference-manifest.js") {
+  location: undefined
+}
+[Server HMR] Subscription error: Error [TurbopackInternalError]: failed to write to "/home/gamp/Desktop/AI-FOOTBALL-DASHBOARD/frontend/.next/dev/server/app/dashboard/page_client-reference-manifest.js"
+
+Caused by:
+- No space left on device (os error 28)
+    at <unknown> (TurbopackInternalError: failed to write to "/home/gamp/Desktop/AI-FOOTBALL-DASHBOARD/frontend/.next/dev/server/app/dashboard/page_client-reference-manifest.js") {
+  location: undefined
+}
+[Server HMR] Subscription error: Error [TurbopackInternalError]: failed to write to "/home/gamp/Desktop/AI-FOOTBALL-DASHBOARD/frontend/.next/dev/server/app/dashboard/page_client-reference-manifest.js"
+
+Caused by:
+- No space left on device (os error 28)
+    at <unknown> (TurbopackInternalError: failed to write to "/home/gamp/Desktop/AI-FOOTBALL-DASHBOARD/frontend/.next/dev/server/app/dashboard/page_client-reference-manifest.js") {
+  location: undefined
+}
+[Server HMR] Subscription error: Error [TurbopackInternalError]: failed to write to "/home/gamp/Desktop/AI-FOOTBALL-DASHBOARD/frontend/.next/dev/server/app/dashboard/page_client-reference-manifest.js"
+
+Caused by:
+- No space left on device (os error 28)
+    at <unknown> (TurbopackInternalError: failed to write to "/home/gamp/Desktop/AI-FOOTBALL-DASHBOARD/frontend/.next/dev/server/app/dashboard/page_client-reference-manifest.js") {
+  location: undefined
+}
+[Server HMR] Subscription error: Error [TurbopackInternalError]: failed to write to "/home/gamp/Desktop/AI-FOOTBALL-DASHBOARD/frontend/.next/dev/server/app/page_client-reference-manifest.js"
+
+Caused by:
+- No space left on device (os error 28)
+    at <unknown> (TurbopackInternalError: failed to write to "/home/gamp/Desktop/AI-FOOTBALL-DASHBOARD/frontend/.next/dev/server/app/page_client-reference-manifest.js") {
+  location: undefined
+}
+[Server HMR] Subscription error: Error [TurbopackInternalError]: failed to write to "/home/gamp/Desktop/AI-FOOTBALL-DASHBOARD/frontend/.next/dev/server/app/page_client-reference-manifest.js"
+
+Caused by:
+- No space left on device (os error 28)
+    at <unknown> (TurbopackInternalEError: ENOSPC: no space left on device, write
+    at ignore-listed frames {
+  errno: -28,
+  syscall: 'write',
+  code: 'ENOSPC'
+}
+⨯ uncaughtException: Error: ENOSPC: no space left on device, write
+    at ignore-listed frames {
+  errno: -28,
+  syscall: 'write',
+  code: 'ENOSPC'
+}
+⨯ uncaughtException:  Error: ENOSPC: no space left on device, write
+    at ignore-listed frames {
+  errno: -28,
+  syscall: 'write',
+  code: 'ENOSPC'
+}
+[Server HMR] Subscription error: Error [TurbopackInternalError]: failed to write to "/home/gamp/Desktop/AI-FOOTBALL-DASHBOARD/frontend/.next/dev/server/app/page_client-reference-manifest.js"
+
+Caused by:
+- No space left on device (os error 28)
+    at <unknown> (TurbopackInternalError: failed to write to "/home/gamp/Desktop/AI-FOOTBALL-DASHBOARD/frontend/.next/dev/server/app/page_client-reference-manifest.js") {
+  location: undefined
+}
+[Server HMR] Subscription error: Error [TurbopackInternalError]: failed to write to "/home/gamp/Desktop/AI-FOOTBALL-DASHBOARD/frontend/.next/dev/server/app/dashboard/page_client-reference-manifest.js"
+
+Caused by:
+- No space left on device (os error 28)
+    at <unknown> (TurbopackInternalError: failed to write to "/home/gamp/Desktop/AI-FOOTBALL-DASHBOARD/frontend/.next/dev/server/app/dashboard/page_client-reference-manifest.js") {
+  location: undefined
+}
+[Server HMR] Subscription error: Error [TurbopackInternalError]: failed to write to "/home/gamp/Desktop/AI-FOOTBALL-DASHBOARD/frontend/.next/dev/server/app/page_client-reference-manifest.js"
+
+Caused by:
+- No space left on device (os error 28)
+    at <unknown> (TurbopackInternalError: failed to write to "/home/gamp/Desktop/AI-FOOTBALL-DASHBOARD/frontend/.next/dev/server/app/page_client-reference-manifest.js") {
+  location: undefined
+}
+[Server HMR] Subscription error: Error [TurbopackInternalError]: failed to write to "/home/gamp/Desktop/AI-FOOTBALL-DASHBOARD/frontend/.next/dev/server/app/dashboard/page_client-reference-manifest.js"
+
+Caused by:
+- No space left on device (os error 28)
+    at <unknown> (TurbopackInternalError: failed to write to "/home/gamp/Desktop/AI-FOOTBALL-DASHBOARD/frontend/.next/dev/server/app/dashboard/page_client-reference-manifest.js") {
+  location: undefined
+}
+[Server HMR] Subscription error: Error [TurbopackInternalError]: failed to write to "/home/gamp/Desktop/AI-FOOTBALL-DASHBOARD/frontend/.next/dev/server/app/page_client-reference-manifest.js"
+
+Caused by:
+- No space left on device (os error 28)
+    at <unknown> (TurbopackInternalError: failed to write to "/home/gamp/Desktop/AI-FOOTBALL-DASHBOARD/frontend/.next/dev/server/app/page_client-reference-manifest.js") {
+  location: undefined
+}
+[Server HMR] Subscription error: Error [TurbopackInternalError]: failed to write to "/home/gamp/Desktop/AI-FOOTBALL-DASHBOARD/frontend/.next/dev/server/app/page_client-reference-manifest.js"
+
+Caused by:
+- No space left on device (os error 28)
+    at <unknown> (TurbopackInternalError: failed to write to "/home/gamp/Desktop/AI-FOOTBALL-DASHBOARD/frontend/.next/dev/server/app/page_client-reference-manifest.js") {
+  location: undefined
+}
+[Server HMR] Subscription error: Error [TurbopackInternalError]: failed to write to "/home/gamp/Desktop/AI-FOOTBALL-DASHBOARD/frontend/.next/dev/server/app/page_client-reference-manifest.js"
+
+Caused by:
+- No space left on device (os error 28)
+    at <unknown> (TurbopackInternalError: failed to write to "/home/gamp/Desktop/AI-FOOTBALL-DASHBOARD/frontend/.next/dev/server/app/page_client-reference-manifest.js") {
+  location: undefined
+}
+[Server HMR] Subscription error: Error [TurbopackInternalError]: failed to write to "/home/gamp/Desktop/AI-FOOTBALL-DASHBOARD/frontend/.next/dev/server/app/page_client-reference-manifest.js"
+
+Caused by:
+- No space left on device (os error 28)
+    at <unknown> (TurbopackInternalError: failed to write to "/home/gamp/Desktop/AI-FOOTBALL-DASHBOARD/frontend/.next/dev/server/app/page_client-reference-manifest.js") {
+  location: undefined
+}
+[Server HMR] Subscription error: Error [TurbopackInternalError]: failed to write to "/home/gamp/Desktop/AI-FOOTBALL-DA

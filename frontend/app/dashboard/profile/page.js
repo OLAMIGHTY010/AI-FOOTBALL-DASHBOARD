@@ -18,8 +18,11 @@ export default function ProfilePage() {
   const { user, aiCoins, addCoins, addToast, isLoadingAuth } = useAppContext();
   
   const [loading, setLoading] = useState(true);
-  const [profile, setProfile] = useState({ xp: 0, level: 1, username: 'Manager', avatar_url: null });
+  const [profile, setProfile] = useState({ xp: 0, level: 1, username: 'Manager', avatar_url: null, full_name: '' });
   const [unlockedBadges, setUnlockedBadges] = useState([]);
+  
+  const [fullName, setFullName] = useState("");
+  const [isSavingName, setIsSavingName] = useState(false);
   
   const [stats, setStats] = useState({
     totalBets: 0,
@@ -58,7 +61,10 @@ export default function ProfilePage() {
         .eq("id", user.id)
         .single();
         
-      if (prof) setProfile(prof);
+      if (prof) {
+        setProfile(prof);
+        setFullName(prof.full_name || "");
+      }
 
       // Get badges
       const { data: badges } = await supabase
@@ -69,6 +75,26 @@ export default function ProfilePage() {
       if (badges) setUnlockedBadges(badges);
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const handleSaveName = async (e) => {
+    e.preventDefault();
+    if (!user) return;
+    setIsSavingName(true);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ full_name: fullName.trim() })
+        .eq('id', user.id);
+      
+      if (error) throw error;
+      addToast("Profile Updated", "Your legal name has been saved.", "success");
+      setProfile(prev => ({ ...prev, full_name: fullName.trim() }));
+    } catch (err) {
+      addToast("Error", err.message, "error");
+    } finally {
+      setIsSavingName(false);
     }
   };
 
@@ -279,13 +305,13 @@ export default function ProfilePage() {
             <div className="text-center">
               <div className="text-sm text-[var(--text-secondary)] font-bold uppercase tracking-wider mb-1">Net Profit</div>
               <div className={`text-2xl font-black ${stats.netProfit >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                {stats.netProfit >= 0 ? '+' : ''}£{stats.netProfit.toFixed(2)}
+                {stats.netProfit >= 0 ? '+' : ''}₦{stats.netProfit.toFixed(2)}
               </div>
             </div>
             <div className="text-center">
               <div className="text-sm text-[var(--text-secondary)] font-bold uppercase tracking-wider mb-1">Biggest Win</div>
               <div className="text-2xl font-black text-yellow-500">
-                £{stats.biggestWin.toFixed(2)}
+                ₦{stats.biggestWin.toFixed(2)}
               </div>
             </div>
           </div>
@@ -308,6 +334,36 @@ export default function ProfilePage() {
           
         </div>
         
+      </div>
+
+      {/* KYC Legal Name Settings */}
+      <div className="glass-card p-8 mt-8 border-t-4 border-blue-500">
+        <h2 className="text-2xl font-black mb-2">Legal Identity (KYC)</h2>
+        <p className="text-[var(--text-secondary)] mb-6">
+          To comply with Anti-Money Laundering (AML) regulations, you must provide your real legal name. 
+          <br/><span className="text-red-400 font-bold">This name MUST strictly match the name on the Bank Account you withdraw funds to.</span>
+        </p>
+
+        <form onSubmit={handleSaveName} className="max-w-md space-y-4">
+          <div>
+            <label className="block text-sm font-bold text-[var(--text-secondary)] mb-2 uppercase tracking-wider">Legal Full Name</label>
+            <input 
+              type="text" 
+              className="input-field w-full" 
+              placeholder="e.g., Jonathan Doe Smith"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              required 
+            />
+          </div>
+          <button 
+            type="submit" 
+            className="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 rounded-lg transition-colors"
+            disabled={isSavingName}
+          >
+            {isSavingName ? "Saving..." : "Save Identity"}
+          </button>
+        </form>
       </div>
     </div>
   );

@@ -429,7 +429,7 @@ function SimulatePage() {
           }
         });
         
-        alert(`🎉 Full Time! Bets Settled! You won £${totalWinnings.toFixed(2)}!`);
+        alert(`🎉 Full Time! Bets Settled! You won ₦${totalWinnings.toFixed(2)}!`);
       } else {
         alert("🏁 Full Time! Simulation Complete. All bets lost.");
       }
@@ -607,19 +607,19 @@ function SimulatePage() {
   };
 
   const placeSlipBet = async () => {
-    const bankroll = parseFloat(localStorage.getItem("bankroll") || "0");
+    const bankroll = aiCoins;
     if (stake > bankroll) {
       alert("Insufficient funds!");
       return;
     }
     const newBankroll = (bankroll - stake).toFixed(2);
-    localStorage.setItem("bankroll", newBankroll);
-    window.dispatchEvent(new Event("bankrollUpdate"));
+    
+    
     deductCoins(stake);
 
     const { data: { session } } = await supabase.auth.getSession();
     if (session) {
-      await supabase.from("wallets").update({ balance: newBankroll }).eq("user_id", session.user.id);
+      await supabase.from("profiles").update({ bankroll: newBankroll }).eq("user_id", session.user.id);
     }
 
     const totalOdds = betSlip.reduce((acc, leg) => acc * parseFloat(leg.odds), 1).toFixed(2);
@@ -640,19 +640,19 @@ function SimulatePage() {
 
   const placeLiveBet = async (market, odds) => {
     const wager = 10; // fixed $10 wager for fast live bets
-    const bankroll = parseFloat(localStorage.getItem("bankroll") || "0");
+    const bankroll = aiCoins;
     if (wager > bankroll) {
       alert("Insufficient funds for a $10 live bet!");
       return;
     }
     
     const newBankroll = bankroll - wager;
-    localStorage.setItem("bankroll", newBankroll.toString());
+    
     window.dispatchEvent(new Event("storage"));
     
     const { data: { session } } = await supabase.auth.getSession();
     if (session) {
-      await supabase.from("wallets").update({ balance: newBankroll }).eq("user_id", session.user.id);
+      await supabase.from("profiles").update({ bankroll: newBankroll }).eq("user_id", session.user.id);
     }
 
     const potentialWin = (wager * odds).toFixed(2);
@@ -1015,7 +1015,7 @@ function SimulatePage() {
             stake={stake} 
             setStake={setStake} 
             placeBet={placeSlipBet}
-            bankroll={parseFloat(typeof window !== "undefined" ? localStorage.getItem("bankroll") || "0" : "0")}
+            bankroll={aiCoins}
           />
         )}
         

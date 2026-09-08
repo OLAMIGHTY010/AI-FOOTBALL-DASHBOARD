@@ -1,5 +1,6 @@
 from database import supabase
-from typing import List, Dict
+from typing import List, Dict, Any
+from pipeline import Pipeline, PipelineError
 
 def process_auto_subs(squad_snapshot_id: int):
     """
@@ -141,82 +142,113 @@ def resolve_h2h_matches(gameweek_id: int):
         print(f"Error resolving H2H matches: {e}")
         return False
 
+# --- Atomic Pipeline Steps for Gameweek Processing ---
+
+def lock_gameweek(context: Dict[str, Any]):
+    gameweek_id = context.get("gameweek_id")
+    if not supabase:
+        raise PipelineError("Database not configured", "lock_gameweek", 500)
+    
+    # We could lock the gameweek so users can't edit their teams.
+    # Marking it 'processing' or simply continuing since it's already locked by deadline.
+    snaps_resp = supabase.table("squad_snapshots").select("id").eq("gameweek_id", gameweek_id).execute()
+    context["snapshots"] = snaps_resp.data
+
+def execute_squad_updates(context: Dict[str, Any]):
+    snapshots = context.get("snapshots", [])
+    for snap in snapshots:
+        snap_id = snap["id"]
+        # Atomic action: process subs
+        process_auto_subs(snap_id)
+        # Atomic action: calculate points
+        calculate_gameweek_points(snap_id)
+
+def resolve_h2h(context: Dict[str, Any]):
+    gameweek_id = context.get("gameweek_id")
+    success = resolve_h2h_matches(gameweek_id)
+    if not success:
+        raise PipelineError("Failed to resolve H2H matches.", "resolve_h2h", 500)
+
+def finalize_gameweek(context: Dict[str, Any]):
+    gameweek_id = context.get("gameweek_id")
+    supabase.table("gameweeks").update({"is_finished": True, "is_current": False}).eq("id", gameweek_id).execute()
+
+def initialize_next_gameweek(context: Dict[str, Any]):
+    gameweek_id = context.get("gameweek_id")
+    snapshots = context.get("snapshots", [])
+    
+    next_gw_resp = supabase.table("gameweeks").select("id").eq("id", gameweek_id + 1).execute()
+    if not next_gw_resp.data:
+        # No next gameweek (end of season)
+        return
+        
+    next_gw_id = next_gw_resp.data[0]["id"]
+    supabase.table("gameweeks").update({"is_current": True}).eq("id", next_gw_id).execute()
+    
+    for snap in snapshots:
+        snap_id = snap["id"]
+        snap_full_resp = supabase.table("squad_snapshots").select("*").eq("id", snap_id).execute()
+        if not snap_full_resp.data:
+            continue
+        snap_data = snap_full_resp.data[0]
+        
+        source_snap_id = snap_id
+        
+        # FREE HIT REVERSION LOGIC
+        if snap_data.get("active_chip") == "FREE_HIT":
+            prev_snap_resp = supabase.table("squad_snapshots").select("id").eq("virtual_team_id", snap_data["virtual_team_id"]).eq("gameweek_id", gameweek_id - 1).execute()
+            if prev_snap_resp.data:
+                source_snap_id = prev_snap_resp.data[0]["id"]
+        
+        # Create next gameweek snapshot
+        new_snap = supabase.table("squad_snapshots").insert({
+            "virtual_team_id": snap_data["virtual_team_id"],
+            "gameweek_id": next_gw_id,
+            "active_chip": None,
+            "gameweek_points": 0,
+            "transfer_cost": 0
+        }).execute()
+        
+        if not new_snap.data:
+            continue
+            
+        new_snap_id = new_snap.data[0]["id"]
+        
+        # Copy picks
+        source_picks_resp = supabase.table("squad_picks").select("*").eq("squad_snapshot_id", source_snap_id).execute()
+        new_picks = []
+        for p in source_picks_resp.data:
+            new_picks.append({
+                "squad_snapshot_id": new_snap_id,
+                "player_id": p["player_id"],
+                "position_order": p["position_order"],
+                "is_captain": p["is_captain"],
+                "is_vice_captain": p["is_vice_captain"],
+                "multiplier": p["multiplier"],
+                "is_auto_sub_in": False,
+                "is_auto_sub_out": False
+            })
+        
+        if new_picks:
+            supabase.table("squad_picks").insert(new_picks).execute()
+
+# --- Orchestrator ---
+
 def process_gameweek(gameweek_id: int):
     """
-    Master function to process the end of a gameweek.
-    1. Run Auto-Subs
-    2. Calculate Points
-    3. Resolve H2H Leagues
+    Master function to process the end of a gameweek using Algorithmic Sequencing.
     """
-    if not supabase:
-        return {"status": "error", "message": "Database not configured"}
-        
+    pipeline = Pipeline("GameweekProcessing")
+    pipeline.add_step(lock_gameweek)
+    pipeline.add_step(execute_squad_updates)
+    pipeline.add_step(resolve_h2h)
+    pipeline.add_step(finalize_gameweek)
+    pipeline.add_step(initialize_next_gameweek)
+    
     try:
-        # 1. Fetch all squad snapshots for this gameweek
-        snaps_resp = supabase.table("squad_snapshots").select("id").eq("gameweek_id", gameweek_id).execute()
-        snapshots = snaps_resp.data
-        
-        for snap in snapshots:
-            snap_id = snap["id"]
-            process_auto_subs(snap_id)
-            calculate_gameweek_points(snap_id)
-            
-        # 2. Resolve H2H Matches
-        resolve_h2h_matches(gameweek_id)
-        
-        # 3. Mark gameweek as finished
-        supabase.table("gameweeks").update({"is_finished": True, "is_current": False}).eq("id", gameweek_id).execute()
-        
-        # 4. Roll over to next gameweek (and handle Free Hit reversion)
-        next_gw_resp = supabase.table("gameweeks").select("id").eq("id", gameweek_id + 1).execute()
-        if next_gw_resp.data:
-            next_gw_id = next_gw_resp.data[0]["id"]
-            supabase.table("gameweeks").update({"is_current": True}).eq("id", next_gw_id).execute()
-            
-            for snap in snapshots:
-                snap_id = snap["id"]
-                snap_full_resp = supabase.table("squad_snapshots").select("*").eq("id", snap_id).execute()
-                snap_data = snap_full_resp.data[0]
-                
-                source_snap_id = snap_id
-                
-                # FREE HIT REVERSION LOGIC
-                if snap_data.get("active_chip") == "FREE_HIT":
-                    # Revert to the gameweek BEFORE the free hit (gameweek_id - 1)
-                    prev_snap_resp = supabase.table("squad_snapshots").select("id").eq("virtual_team_id", snap_data["virtual_team_id"]).eq("gameweek_id", gameweek_id - 1).execute()
-                    if prev_snap_resp.data:
-                        source_snap_id = prev_snap_resp.data[0]["id"]
-                
-                # Create next gameweek snapshot
-                new_snap = supabase.table("squad_snapshots").insert({
-                    "virtual_team_id": snap_data["virtual_team_id"],
-                    "gameweek_id": next_gw_id,
-                    "active_chip": None,
-                    "gameweek_points": 0,
-                    "transfer_cost": 0
-                }).execute()
-                
-                new_snap_id = new_snap.data[0]["id"]
-                
-                # Copy picks from source_snap_id
-                source_picks_resp = supabase.table("squad_picks").select("*").eq("squad_snapshot_id", source_snap_id).execute()
-                
-                new_picks = []
-                for p in source_picks_resp.data:
-                    new_picks.append({
-                        "squad_snapshot_id": new_snap_id,
-                        "player_id": p["player_id"],
-                        "position_order": p["position_order"],
-                        "is_captain": p["is_captain"],
-                        "is_vice_captain": p["is_vice_captain"],
-                        "multiplier": p["multiplier"],
-                        "is_auto_sub_in": False,
-                        "is_auto_sub_out": False
-                    })
-                
-                if new_picks:
-                    supabase.table("squad_picks").insert(new_picks).execute()
-                    
-        return {"status": "success", "message": f"Processed Gameweek {gameweek_id} for {len(snapshots)} teams"}
+        context = pipeline.execute({"gameweek_id": gameweek_id})
+        return {"status": "success", "message": f"Processed Gameweek {gameweek_id} for {len(context.get('snapshots', []))} teams"}
+    except PipelineError as e:
+        return {"status": "error", "message": f"Pipeline failed at {e.step_name}: {str(e)}"}
     except Exception as e:
         return {"status": "error", "message": str(e)}

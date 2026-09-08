@@ -80,7 +80,7 @@ export default function PvPPage() {
     const isDraw = data.result.winner === "draw";
     
     if (iWon || isDraw) {
-      let currentBankroll = parseFloat(localStorage.getItem("bankroll") || "0");
+      let currentBankroll = aiCoins;
       currentBankroll += data.result.payout;
       localStorage.setItem("bankroll", currentBankroll.toString());
       window.dispatchEvent(new Event("storage"));
@@ -93,7 +93,7 @@ export default function PvPPage() {
   };
 
   const deductWager = async (amount) => {
-    let currentBankroll = parseFloat(localStorage.getItem("bankroll") || "0");
+    let currentBankroll = aiCoins;
     if (currentBankroll < amount) return false;
 
     currentBankroll -= amount;

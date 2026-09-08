@@ -5,5 +5,3 @@ supabase
 pydantic
 pulp
 requests
-supabase
-requests

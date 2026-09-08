@@ -5,7 +5,6 @@ from typing import List, Optional
 import uuid
 from datetime import datetime
 import random
-import random
 import string
 import scraper
 import requests
@@ -32,6 +31,19 @@ from fpl_proxy import (
     get_fpl_bootstrap, get_fpl_fixtures, get_fpl_league,
     get_fpl_entry, get_fpl_entry_history, get_fpl_picks
 )
+from responsible_gambling import (
+    set_self_exclusion, check_self_exclusion, lift_self_exclusion,
+    set_deposit_limits, check_deposit_allowed,
+    set_loss_limit, record_loss,
+    check_age_verified, verify_age,
+    LEGAL_DISCLAIMER
+)
+from pipeline import PipelineError
+from betting_service import process_parlay_bet
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = FastAPI(title="AI Football Dashboard API")
 
@@ -455,50 +467,16 @@ settled_virtual_bets: List[Dict[str, Any]] = []
 
 @app.post("/api/bet/parlay")
 def place_parlay(req: ParlayRequest):
-    combined_odds = 1.0
-    for leg in req.legs:
-        combined_odds *= leg.get("odds", 1.0)
-    
-    bet_record = {
-        "id": str(uuid.uuid4()),
-        "user_id": req.user_id,
-        "wager": req.wager,
-        "combined_odds": round(combined_odds, 2),
-        "potential_payout": round(req.wager * combined_odds, 2),
-        "legs": req.legs,
-        "status": "PENDING",
-        "timestamp": datetime.now().isoformat()
-    }
-    
-    # Deduct wager from wallet
-    if req.user_id and supabase:
-        try:
-            wallet_res = supabase.table("profiles").select("bankroll").eq("id", req.user_id).execute()
-            if wallet_res.data:
-                current_bal = float(wallet_res.data[0].get("bankroll", 0) or 0)  # type: ignore
-                new_bal = current_bal - req.wager
-                supabase.table("profiles").update({"bankroll": new_bal}).eq("id", req.user_id).execute()
-        except Exception as e:
-            print("Error deducting wager:", e)
-
-    pending_virtual_bets.append(bet_record)
-    
-    # Sync placement to Supabase
-    if supabase:
-        try:
-            supabase.table("virtual_bets").insert({
-                "id": bet_record["id"],
-                "user_id": bet_record["user_id"],
-                "wager": bet_record["wager"],
-                "combined_odds": bet_record["combined_odds"],
-                "potential_payout": bet_record["potential_payout"],
-                "legs": bet_record["legs"],
-                "status": bet_record["status"]
-            }).execute()  # type: ignore
-        except Exception as e:
-            print("Error inserting bet into Supabase:", e)
-    
-    return bet_record
+    try:
+        bet_record = process_parlay_bet(req)
+        # We append to memory state for immediate WebSocket/Dashboard updates
+        pending_virtual_bets.append(bet_record)
+        return bet_record
+    except PipelineError as pe:
+        raise HTTPException(status_code=pe.status_code, detail=str(pe))
+    except Exception as e:
+        logger.error(f"Unexpected error in place_parlay: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 class CashOutRequest(BaseModel):
     bet_id: str
@@ -984,12 +962,8 @@ def create_league(req: CreateLeagueRequest):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@app.get("/api/fpl/league/{league_id}")
-def get_fpl_league_endpoint(league_id: int):
-    data = get_fpl_league(league_id)
-    if not data:
-        raise HTTPException(status_code=404, detail="League not found")
-    return data
+# NOTE: Duplicate route removed. Using the one at line 948 (fpl_league) instead.
+# The get_fpl_league_endpoint function was a duplicate of /api/fpl/league/{league_id}.
 
 @app.get("/api/fpl/recommender")
 def fpl_recommender():
@@ -1220,8 +1194,16 @@ def init_profile(req: InitProfileRequest):
                 "username": f"Manager_{req.user_id[:8]}",
                 "bankroll": 1000
             }
-            supabase.table("profiles").insert(new_prof).execute()
-            return new_prof
+            try:
+                supabase.table("profiles").insert(new_prof).execute()
+                return new_prof
+            except Exception as insert_err:
+                if '23505' in str(insert_err) or 'duplicate key' in str(insert_err).lower():
+                    # If it already exists (inserted concurrently), fetch it
+                    res_retry = supabase.table("profiles").select("*").eq("id", req.user_id).execute()
+                    if res_retry.data:
+                        return res_retry.data[0]
+                raise insert_err
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -1257,7 +1239,7 @@ def create_paystack_checkout(req: CheckoutRequest):
                 print("Sandbox credit error:", e)
 
         return {
-            "authorization_url": f"http://localhost:3000/dashboard/store?success=true"
+            "authorization_url": f"http://localhost:3000/dashboard/wallet?success=true"
         }
         
     headers = {
@@ -1273,8 +1255,8 @@ def create_paystack_checkout(req: CheckoutRequest):
             "user_id": req.user_id,
             "product_id": req.product_id
         },
-        "callback_url": f"http://localhost:3000/dashboard/store?success=true&added_coins={coins_to_add}",
-        "cancel_url": "http://localhost:3000/dashboard/store?canceled=true"
+        "callback_url": f"http://localhost:3000/dashboard/wallet?success=true&added_coins={coins_to_add}",
+        "cancel_url": "http://localhost:3000/dashboard/wallet?canceled=true"
     }
     
     try:
@@ -1296,7 +1278,7 @@ def create_paystack_checkout(req: CheckoutRequest):
                 pass
                 
         return {
-            "authorization_url": f"http://localhost:3000/dashboard/store?success=true"
+            "authorization_url": f"http://localhost:3000/dashboard/wallet?success=true"
         }
 
 @app.post("/api/webhook/paystack")
@@ -1346,6 +1328,108 @@ async def paystack_webhook(request: Request, background_tasks: BackgroundTasks):
             
     return {"status": "success"}
 
+class WalletTxRequest(BaseModel):
+    user_id: str
+    amount: float
+    description: str = ""
+
+@app.post("/api/wallet/transaction")
+def process_wallet_transaction(req: WalletTxRequest):
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Database not configured")
+    try:
+        if req.amount > 0:
+            supabase.rpc("process_deposit", {"p_user_id": req.user_id, "p_amount": req.amount}).execute()
+        elif req.amount < 0:
+            supabase.rpc("process_withdrawal", {"p_user_id": req.user_id, "p_amount": abs(req.amount)}).execute()
+            
+        wallet_res = supabase.table("profiles").select("bankroll").eq("id", req.user_id).execute()
+        if wallet_res.data:
+            return {"status": "success", "bankroll": wallet_res.data[0].get("bankroll")}
+        return {"status": "success"}
+    except Exception as e:
+        # Fallback to direct update if RPC is missing
+        try:
+            wallet_res = supabase.table("profiles").select("bankroll").eq("id", req.user_id).execute()
+            if wallet_res.data:
+                current_bal = float(wallet_res.data[0].get("bankroll", 0) or 0)
+                new_bal = current_bal + req.amount
+                if new_bal < 0:
+                    raise HTTPException(status_code=400, detail="Insufficient bankroll.")
+                supabase.table("profiles").update({"bankroll": new_bal}).eq("id", req.user_id).execute()
+                return {"status": "success", "bankroll": new_bal}
+            raise HTTPException(status_code=400, detail="User not found.")
+        except Exception as ex:
+            raise HTTPException(status_code=400, detail=str(ex))
+
+class WithdrawRequest(BaseModel):
+    user_id: str
+    email: str
+    amount: float
+    bank_code: str
+    account_number: str
+
+@app.post("/api/wallet/withdraw")
+def process_wallet_withdrawal(req: WithdrawRequest):
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Database not configured")
+        
+    # 1. Fetch user's registered name
+    prof_res = supabase.table("profiles").select("full_name").eq("id", req.user_id).execute()
+    if not prof_res.data or not prof_res.data[0].get("full_name"):
+        raise HTTPException(status_code=400, detail="KYC Verification Failed: Please set your Legal Full Name in your profile.")
+        
+    user_full_name = prof_res.data[0]["full_name"].strip()
+    
+    # 2. Call Paystack Resolve Account Number API
+    PAYSTACK_SECRET = os.environ.get("PAYSTACK_SECRET_KEY", "")
+    if not PAYSTACK_SECRET:
+        raise HTTPException(status_code=500, detail="Payment gateway not configured. Please set PAYSTACK_SECRET_KEY.")
+        
+    try:
+        headers = {"Authorization": f"Bearer {PAYSTACK_SECRET}"}
+        url = f"https://api.paystack.co/bank/resolve?account_number={req.account_number}&bank_code={req.bank_code}"
+        resolve_res = requests.get(url, headers=headers, timeout=5)
+        
+        if resolve_res.status_code != 200:
+            raise HTTPException(status_code=400, detail=f"Invalid bank account details. Paystack could not resolve this account. Paystack Error: {resolve_res.text}")
+            
+        bank_data = resolve_res.json().get("data", {})
+        account_name = bank_data.get("account_name", "").strip()
+        
+        # 3. Strict 100% Exact Match
+        if account_name.lower() != user_full_name.lower():
+            raise HTTPException(
+                status_code=400, 
+                detail=f"KYC Verification Failed: The bank account name '{account_name}' does not exactly match your registered name '{user_full_name}'."
+            )
+            
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Error resolving bank account: " + str(e))
+        
+    # 4. Proceed with deduction
+    try:
+        supabase.rpc("process_withdrawal", {"p_user_id": req.user_id, "p_amount": req.amount}).execute()
+    except Exception as e:
+        # Fallback
+        try:
+            wallet_res = supabase.table("profiles").select("bankroll").eq("id", req.user_id).execute()
+            if wallet_res.data:
+                current_bal = float(wallet_res.data[0].get("bankroll", 0) or 0)
+                if current_bal < req.amount:
+                    raise HTTPException(status_code=400, detail="Insufficient bankroll.")
+                new_bal = current_bal - req.amount
+                supabase.table("profiles").update({"bankroll": new_bal}).eq("id", req.user_id).execute()
+            else:
+                raise HTTPException(status_code=400, detail="User not found.")
+        except Exception as ex:
+            raise HTTPException(status_code=400, detail=str(ex))
+            
+    # Simulate a successful Paystack transfer payout
+    return {"status": "success", "message": f"Successfully verified KYC and withdrew NGN {req.amount} to account {req.account_number}"}
+
 @app.get("/api/news")
 def get_live_news():
     news_items = []
@@ -1394,6 +1478,107 @@ def get_live_news():
         news_items = ["LIVE: Welcome to AI Football Dashboard! ⚽"]
         
     return {"news": news_items}
+
+
+# ──────────────────────────────────────────────
+# Responsible Gambling API Endpoints
+# ──────────────────────────────────────────────
+
+class SelfExclusionRequest(BaseModel):
+    user_id: str
+    duration_days: Optional[int] = None  # None = permanent
+
+@app.post("/api/responsible-gambling/self-exclude")
+def api_self_exclude(req: SelfExclusionRequest):
+    return set_self_exclusion(req.user_id, req.duration_days)
+
+@app.get("/api/responsible-gambling/self-exclusion-status")
+def api_self_exclusion_status(user_id: str):
+    return check_self_exclusion(user_id)
+
+@app.post("/api/responsible-gambling/lift-exclusion")
+def api_lift_exclusion(req: SelfExclusionRequest):
+    return lift_self_exclusion(req.user_id)
+
+
+class DepositLimitRequest(BaseModel):
+    user_id: str
+    daily: Optional[float] = None
+    weekly: Optional[float] = None
+    monthly: Optional[float] = None
+
+@app.post("/api/responsible-gambling/deposit-limits")
+def api_set_deposit_limits(req: DepositLimitRequest):
+    return set_deposit_limits(req.user_id, req.daily, req.weekly, req.monthly)
+
+@app.get("/api/responsible-gambling/check-deposit")
+def api_check_deposit(user_id: str, amount: float):
+    return check_deposit_allowed(user_id, amount)
+
+
+class LossLimitRequest(BaseModel):
+    user_id: str
+    daily_limit: float
+
+@app.post("/api/responsible-gambling/loss-limit")
+def api_set_loss_limit(req: LossLimitRequest):
+    return set_loss_limit(req.user_id, req.daily_limit)
+
+
+class AgeVerifyRequest(BaseModel):
+    user_id: str
+    date_of_birth: str  # YYYY-MM-DD
+
+@app.post("/api/responsible-gambling/verify-age")
+def api_verify_age(req: AgeVerifyRequest):
+    return verify_age(req.user_id, req.date_of_birth)
+
+@app.get("/api/responsible-gambling/age-status")
+def api_age_status(user_id: str):
+    verified = check_age_verified(user_id)
+    return {"age_verified": verified}
+
+
+@app.get("/api/legal/disclaimer")
+def api_legal_disclaimer():
+    return {"disclaimer": LEGAL_DISCLAIMER}
+
+
+@app.get("/api/legal/terms")
+def api_terms_of_service():
+    return {
+        "title": "Terms of Service",
+        "content": (
+            "By using AI Football Dashboard, you agree to the following terms:\n\n"
+            "1. You must be 18 years or older to use this service.\n"
+            "2. You are responsible for ensuring online gambling is legal in your jurisdiction.\n"
+            "3. All funds deposited are at risk of loss.\n"
+            "4. Virtual match outcomes are determined by probability-based algorithms.\n"
+            "5. We reserve the right to void bets placed in error or through exploitation.\n"
+            "6. Withdrawals are subject to KYC verification.\n"
+            "7. We implement responsible gambling measures including deposit limits and self-exclusion.\n"
+            "8. Account sharing or multi-accounting is prohibited.\n"
+            "9. We are not liable for losses incurred through gambling.\n"
+            "10. These terms are governed by the laws of your registered jurisdiction.\n"
+        )
+    }
+
+
+class AcceptTermsRequest(BaseModel):
+    user_id: str
+
+@app.post("/api/legal/accept-terms")
+def api_accept_terms(req: AcceptTermsRequest):
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Database not configured")
+    try:
+        supabase.table("profiles").update({
+            "accepted_terms_at": datetime.now().isoformat()
+        }).eq("id", req.user_id).execute()
+        return {"success": True}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
 
 if __name__ == "__main__":
     import uvicorn

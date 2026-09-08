@@ -97,17 +97,18 @@ export function AppProvider({ children }) {
     }
   };
 
-  // Sync Bankroll up to Supabase when it changes
-  useEffect(() => {
-    if (user) {
-      const timer = setTimeout(() => {
-        supabase.from('profiles').update({ bankroll: aiCoins }).eq('id', user.id).then();
-      }, 1000);
-      return () => clearTimeout(timer);
-    }
-    // Also save to localStorage as fallback
-    localStorage.setItem('aiCoins', aiCoins.toString());
-  }, [aiCoins, user]);
+  // Bankroll state is now securely managed by the backend. 
+  // We periodically refresh it, but we DO NOT overwrite it from the client.
+  const refreshBankroll = async () => {
+    if (!user) return;
+    try {
+      const { data, error } = await supabase.from('profiles').select('bankroll').eq('id', user.id).maybeSingle();
+      if (!error && data) {
+        setAiCoins(parseFloat(data.bankroll || 0));
+        localStorage.setItem('aiCoins', data.bankroll.toString());
+      }
+    } catch (e) {}
+  };
 
   // Expose a generic sync function for other components (like UT, Season) to push JSON state
   const syncGameState = async (columnName, jsonState) => {
@@ -199,14 +200,40 @@ export function AppProvider({ children }) {
     }
   };
 
+  const processWalletTx = async (amount) => {
+    if (!user) return;
+    try {
+      const res = await fetch('http://localhost:8000/api/wallet/transaction', {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_id: user.id,
+          amount: amount,
+          description: "Frontend Transaction"
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.bankroll !== undefined) {
+          setAiCoins(parseFloat(data.bankroll));
+          localStorage.setItem('aiCoins', data.bankroll.toString());
+        }
+      }
+    } catch (e) {
+      console.error("Wallet Tx Error:", e);
+    }
+  };
+
   const addCoins = (amount) => {
-    setAiCoins(prev => prev + amount);
+    setAiCoins(prev => prev + amount); // Optimistic UI
     if (amount > 0) playSound('/sounds/coin.wav');
+    processWalletTx(amount);
   };
 
   const deductCoins = (amount) => {
     if (aiCoins >= amount) {
-      setAiCoins(prev => prev - amount);
+      setAiCoins(prev => prev - amount); // Optimistic UI
+      processWalletTx(-amount);
       return true;
     }
     return false;
@@ -223,7 +250,7 @@ export function AppProvider({ children }) {
     <AppContext.Provider value={{
       user, isLoadingAuth, syncGameState,
       theme, toggleTheme,
-      aiCoins, addCoins, deductCoins,
+      aiCoins, setAiCoins, addCoins, deductCoins,
       soundEnabled, toggleSound, playSound,
       showDailyRewardModal,
       setShowDailyRewardModal,

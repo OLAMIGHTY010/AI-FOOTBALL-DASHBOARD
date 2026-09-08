@@ -31,7 +31,7 @@ export default function LiveBettingPage() {
   const [showReportModal, setShowReportModal] = useState(false);
   const commentaryRef = useRef(null);
 
-  const { deductCoins, playSound } = useAppContext();
+  const { aiCoins, setAiCoins, deductCoins, playSound } = useAppContext();
 
   useEffect(() => {
     // Generate a mock match schedule
@@ -91,12 +91,12 @@ export default function LiveBettingPage() {
           if (liveBet && !betSettled) {
             if (e.team === liveBet.team) {
               const winAmount = (liveBet.wager * liveBet.odds).toFixed(2);
-              let bank = parseFloat(localStorage.getItem("bankroll") || "0");
+              let bank = aiCoins;
               bank += parseFloat(winAmount);
-              localStorage.setItem("bankroll", bank.toString());
-              window.dispatchEvent(new Event("bankrollUpdate"));
+              setAiCoins(bank); supabase.from("profiles").update({ bankroll: bank }).eq("id", (await supabase.auth.getSession()).data.session?.user?.id).then();
+              
               playSound("coin");
-              alert(`🎉 You won your Live Bet! ${e.team} scored next! (+£${winAmount})`);
+              alert(`🎉 You won your Live Bet! ${e.team} scored next! (+₦${winAmount})`);
             } else {
               alert(`😭 You lost your Live Bet. ${e.team} scored next.`);
             }
@@ -146,12 +146,12 @@ export default function LiveBettingPage() {
       // If no goals were scored since the bet, 'none' wins.
       if (liveBet.team === "none") {
         const winAmount = (liveBet.wager * liveBet.odds).toFixed(2);
-        let bank = parseFloat(localStorage.getItem("bankroll") || "0");
+        let bank = aiCoins;
         bank += parseFloat(winAmount);
-        localStorage.setItem("bankroll", bank.toString());
-        window.dispatchEvent(new Event("bankrollUpdate"));
+        setAiCoins(bank); supabase.from("profiles").update({ bankroll: bank }).eq("id", (await supabase.auth.getSession()).data.session?.user?.id).then();
+        
         playSound("coin");
-        alert(`🎉 You won your Live Bet! No goals were scored! (+£${winAmount})`);
+        alert(`🎉 You won your Live Bet! No goals were scored! (+₦${winAmount})`);
       } else {
         alert("😭 You lost your Live Bet. No more goals were scored.");
       }
@@ -173,10 +173,10 @@ export default function LiveBettingPage() {
       alert("You already have an active live bet for the next goal!");
       return;
     }
-    const bankroll = parseFloat(localStorage.getItem("bankroll") || "0");
-    const wager = 20; // Fixed £20
+    const bankroll = aiCoins;
+    const wager = 20; // Fixed ₦20
     if (wager > bankroll) {
-      alert("Insufficient funds for a £20 live bet!");
+      alert("Insufficient funds for a ₦20 live bet!");
       return;
     }
 
@@ -184,8 +184,8 @@ export default function LiveBettingPage() {
     
     // Deduct coins
     const newBankroll = bankroll - wager;
-    localStorage.setItem("bankroll", newBankroll.toString());
-    window.dispatchEvent(new Event("bankrollUpdate"));
+    
+    
     deductCoins(wager);
     playSound("coin");
     
@@ -304,7 +304,7 @@ export default function LiveBettingPage() {
           
           {liveBet && (
             <div className="mt-6 text-center text-sm text-[var(--text-secondary)]">
-              Pending £{liveBet.wager} bet on {liveBet.team === "none" ? "No Goals" : liveBet.team}. To Win: £{(liveBet.wager * liveBet.odds).toFixed(2)}
+              Pending ₦{liveBet.wager} bet on {liveBet.team === "none" ? "No Goals" : liveBet.team}. To Win: ₦{(liveBet.wager * liveBet.odds).toFixed(2)}
             </div>
           )}
         </div>

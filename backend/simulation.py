@@ -1,5 +1,7 @@
 import random
+from typing import Dict, Any
 from data import VIRTUAL_TEAMS
+from pipeline import Pipeline, PipelineError
 
 TEAM_PENALTIES = {
     league: {team: {"injuries": 0, "suspensions": 0} for team in teams}
@@ -155,8 +157,15 @@ def generate_fixtures():
 
 from tactics import FORMATIONS, TACTICAL_STYLES
 
-def simulate_match(home_team, away_team, weather='Sunny', h_tactics=None, a_tactics=None):
-    """Simulate a full 90-minute match and return the result."""
+# --- Atomic Pipeline Steps for Match Simulation ---
+
+def initialize_match_context(context: Dict[str, Any]) -> None:
+    home_team = context["home_team"]
+    away_team = context["away_team"]
+    weather = context.get("weather", "Sunny")
+    h_tactics = context.get("h_tactics")
+    a_tactics = context.get("a_tactics")
+
     match = {
         "home": home_team,
         "away": away_team,
@@ -185,7 +194,6 @@ def simulate_match(home_team, away_team, weather='Sunny', h_tactics=None, a_tact
     else:
         match["highlights"].append("0' - Kickoff! Beautiful sunny conditions for a football match today.")
 
-    # Default modifiers
     h_att_mod = h_def_mod = h_foul_mod = h_corner_mod = 1.0
     a_att_mod = a_def_mod = a_foul_mod = a_corner_mod = 1.0
 
@@ -205,8 +213,6 @@ def simulate_match(home_team, away_team, weather='Sunny', h_tactics=None, a_tact
         a_foul_mod = a_style.get('foul_mod', 1.0)
         a_corner_mod = a_style.get('corner_mod', 1.0)
 
-    # Calculate chances based on power and tactical mods
-    # h_chance is Home Attack vs Away Defense
     h_effective_power = home_team["power"] * h_att_mod
     a_effective_def = away_team["power"] * a_def_mod
     h_chance = ((h_effective_power / 90.0) * 0.02) * weather_mod * (h_effective_power / max(1, a_effective_def))
@@ -221,18 +227,29 @@ def simulate_match(home_team, away_team, weather='Sunny', h_tactics=None, a_tact
     avg_foul_mod = (h_foul_mod + a_foul_mod) / 2.0
     foul_chance = ((1.0 - (power_diff / 50.0)) * 0.25) * foul_mod * avg_foul_mod
 
+    context["match"] = match
+    context["chances"] = {
+        "h_chance": h_chance,
+        "a_chance": a_chance,
+        "corner_chance": corner_chance,
+        "foul_chance": foul_chance
+    }
+
+def generate_match_events(context: Dict[str, Any]) -> None:
+    match = context["match"]
+    chances = context["chances"]
+    home_team = context["home_team"]
+    away_team = context["away_team"]
+
     def get_scorer(star_name):
         if random.random() < 0.4:
             return star_name
-        
-        # Generate a fake name for other players
-        first_names = ["A.", "B.", "C.", "D.", "E.", "F.", "G.", "H.", "J.", "K.", "L.", "M.", "N.", "P.", "R.", "S.", "T.", "V.", "W.", "Y.", "Z."]
-        last_names = ["Smith", "Silva", "Gomez", "Kim", "Jones", "Williams", "Brown", "Taylor", "Davies", "Evans", "Thomas", "Johnson", "Roberts", "Walker", "Wright", "Robinson", "Thompson", "White", "Hughes", "Edwards", "Green", "Hall", "Wood", "Harris", "Martin", "Jackson", "Clarke"]
+        first_names = ["A.", "B.", "C.", "D.", "E.", "F.", "G.", "H.", "J.", "K.", "L.", "M.", "N."]
+        last_names = ["Smith", "Silva", "Gomez", "Kim", "Jones", "Williams", "Brown", "Taylor", "Davies", "Evans", "Thomas"]
         return f"{random.choice(first_names)} {random.choice(last_names)}"
 
     for minute in range(1, 91):
-        # Goals
-        if random.random() < h_chance:
+        if random.random() < chances["h_chance"]:
             match["h_goals"] += 1
             scorer = get_scorer(home_team["star"])
             if scorer == home_team["star"]:
@@ -240,7 +257,7 @@ def simulate_match(home_team, away_team, weather='Sunny', h_tactics=None, a_tact
             match["events"].append({"minute": minute, "type": "goal", "team": "home", "player": scorer, "x": random.randint(85, 95), "y": random.randint(40, 60)})
             match["highlights"].append(f"{minute}' - GOAL for {home_team['name']}! {scorer} finds the back of the net!")
 
-        if random.random() < a_chance:
+        if random.random() < chances["a_chance"]:
             match["a_goals"] += 1
             scorer = get_scorer(away_team["star"])
             if scorer == away_team["star"]:
@@ -248,8 +265,7 @@ def simulate_match(home_team, away_team, weather='Sunny', h_tactics=None, a_tact
             match["events"].append({"minute": minute, "type": "goal", "team": "away", "player": scorer, "x": random.randint(5, 15), "y": random.randint(40, 60)})
             match["highlights"].append(f"{minute}' - GOAL for {away_team['name']}! Brilliant finish by {scorer}!")
 
-        # Corners
-        if random.random() < corner_chance:
+        if random.random() < chances["corner_chance"]:
             side = "home" if random.random() < 0.5 else "away"
             if side == "home":
                 match["h_corners"] += 1
@@ -259,8 +275,7 @@ def simulate_match(home_team, away_team, weather='Sunny', h_tactics=None, a_tact
             y_coord = random.choice([0, 100])
             match["events"].append({"minute": minute, "type": "corner", "team": side, "x": x_coord, "y": y_coord})
 
-        # Fouls & Cards
-        if random.random() < foul_chance:
+        if random.random() < chances["foul_chance"]:
             side = "home" if random.random() < 0.5 else "away"
             if side == "home":
                 match["h_fouls"] += 1
@@ -273,7 +288,6 @@ def simulate_match(home_team, away_team, weather='Sunny', h_tactics=None, a_tact
                     match["red_card"] = True
                     match["events"].append({"minute": minute, "type": "red_card", "team": side, "x": random.randint(20, 80), "y": random.randint(10, 90)})
                     match["highlights"].append(f"{minute}' - RED CARD! A player from {side} is sent off for a reckless challenge!")
-                    # apply suspension
                     team_name = home_team["name"] if side == "home" else away_team["name"]
                     league_name = home_team.get("league")
                     if league_name in TEAM_PENALTIES and team_name in TEAM_PENALTIES[league_name]:
@@ -285,7 +299,6 @@ def simulate_match(home_team, away_team, weather='Sunny', h_tactics=None, a_tact
                         match["a_yellows"] += 1
                     match["events"].append({"minute": minute, "type": "yellow_card", "team": side, "x": random.randint(20, 80), "y": random.randint(10, 90)})
             
-            # Injury chance on fouls
             if random.random() < 0.02:
                 injured_side = "away" if side == "home" else "home"
                 match["events"].append({"minute": minute, "type": "injury", "team": injured_side, "x": random.randint(20, 80), "y": random.randint(10, 90)})
@@ -295,7 +308,33 @@ def simulate_match(home_team, away_team, weather='Sunny', h_tactics=None, a_tact
                 if league_name in TEAM_PENALTIES and team_name in TEAM_PENALTIES[league_name]:
                     TEAM_PENALTIES[league_name][team_name]["injuries"] = 2
 
-    return match
+def compile_match_result(context: Dict[str, Any]) -> None:
+    match = context["match"]
+    match["highlights"].append("90' - The referee blows the final whistle! Full time.")
+    # In a more complex simulation, we could run post-match analytics here.
+
+
+def simulate_match(home_team, away_team, weather='Sunny', h_tactics=None, a_tactics=None):
+    """Orchestrates match simulation using Algorithmic Sequencing."""
+    pipeline = Pipeline(f"SimulateMatch_{home_team['name']}_vs_{away_team['name']}")
+    pipeline.add_step(initialize_match_context)
+    pipeline.add_step(generate_match_events)
+    pipeline.add_step(compile_match_result)
+    
+    initial_context = {
+        "home_team": home_team,
+        "away_team": away_team,
+        "weather": weather,
+        "h_tactics": h_tactics,
+        "a_tactics": a_tactics
+    }
+    
+    try:
+        final_context = pipeline.execute(initial_context)
+        return final_context["match"]
+    except PipelineError as e:
+        print(f"Error simulating match: {e}")
+        return None
 
 
 def check_bet_result(bet_market, match):

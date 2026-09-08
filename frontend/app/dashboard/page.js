@@ -86,7 +86,7 @@ export default function DashboardHome() {
     setDraggedWidget(null);
   };
 
-  const bankroll = parseFloat(localStorage.getItem("bankroll") || "0");
+  const bankroll = aiCoins;
   const settledAll = JSON.parse(localStorage.getItem("settled_bets") || "[]");
   const wins = settledAll.filter(b => b.status === "WON").length;
   const losses = settledAll.filter(b => b.status === "LOST").length;

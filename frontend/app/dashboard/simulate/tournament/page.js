@@ -55,7 +55,7 @@ export default function TournamentPage() {
       alert("Betting is closed once the tournament has started!");
       return;
     }
-    const bankroll = parseFloat(localStorage.getItem("bankroll") || "0");
+    const bankroll = aiCoins;
     const wager = 50; // Fixed $50 wager
     if (wager > bankroll) {
       alert("Insufficient funds!");
@@ -66,8 +66,8 @@ export default function TournamentPage() {
     
     // Deduct coins
     const newBankroll = bankroll - wager;
-    localStorage.setItem("bankroll", newBankroll.toString());
-    window.dispatchEvent(new Event("bankrollUpdate"));
+    
+    
     deductCoins(wager);
     playSound("coin");
     
@@ -156,12 +156,12 @@ export default function TournamentPage() {
         // Payout futures bet
         if (futuresBet && futuresBet.team.name === newBracket.winner.name) {
           setTimeout(() => {
-            let currentBankroll = parseFloat(localStorage.getItem("bankroll") || "0");
+            let currentBankroll = aiCoins;
             currentBankroll += parseFloat(futuresBet.potentialWin);
             localStorage.setItem("bankroll", currentBankroll.toString());
-            window.dispatchEvent(new Event("bankrollUpdate"));
+            
             playSound("coin");
-            alert(`🎉 CONGRATULATIONS! Your futures bet won £${futuresBet.potentialWin}!`);
+            alert(`🎉 CONGRATULATIONS! Your futures bet won ₦${futuresBet.potentialWin}!`);
           }, 1000);
         } else if (futuresBet) {
           setTimeout(() => {
@@ -229,15 +229,15 @@ export default function TournamentPage() {
                 <p className="text-sm text-[var(--text-secondary)]">Your Pick to Win</p>
                 <p className="font-black text-xl">{futuresBet.team.name}</p>
                 <div className="flex justify-between text-sm pt-2 border-t border-gray-800">
-                  <span>Wager: £{futuresBet.wager}</span>
-                  <span className="text-green-400">To Win: £{futuresBet.potentialWin}</span>
+                  <span>Wager: ₦{futuresBet.wager}</span>
+                  <span className="text-green-400">To Win: ₦{futuresBet.potentialWin}</span>
                 </div>
               </div>
             ) : activeRound !== "qf" || bracket.qf[0]?.winner !== null ? (
               <div className="text-center py-4 text-gray-500">Betting Closed.</div>
             ) : (
               <div className="space-y-2">
-                <p className="text-xs text-[var(--text-secondary)] mb-2">Pick the tournament winner. Fixed £50 wager.</p>
+                <p className="text-xs text-[var(--text-secondary)] mb-2">Pick the tournament winner. Fixed ₦50 wager.</p>
                 {teams.map(team => {
                   const odds = (100 / team.power).toFixed(2);
                   return (

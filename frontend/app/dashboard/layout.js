@@ -9,6 +9,7 @@ import CommandPalette from "@/app/components/CommandPalette";
 import AIChatbot from "@/app/dashboard/components/AIChatbot";
 import NotificationBell from "@/app/dashboard/components/NotificationBell";
 import MobileBottomNav from "@/app/components/MobileBottomNav";
+import LegalFooter from "@/app/components/LegalFooter";
 import { translations } from "@/lib/translations";
 
 const API_URL = "http://localhost:8000";
@@ -22,9 +23,10 @@ const NAV_ITEMS = [
   { href: "/dashboard/analytics", label: "Analytics", id: "analytics" },
   { href: "/dashboard/leaderboards", label: "Global Ranks", id: "globalRanks" },
   { href: "/dashboard/chat", label: "Global Chat", id: "globalChat" },
-  { href: "/dashboard/store", label: "🪙 Store", id: "store" },
+  { href: "/dashboard/wallet", label: "💳 Wallet", id: "wallet" },
   { href: "/dashboard/subscription", label: "👑 VIP", id: "subscription" },
   { href: "/dashboard/profile", label: "Profile", id: "profile" },
+  { href: "/dashboard/responsible-gambling", label: "🛡️ Responsible Gambling", id: "responsibleGambling" },
 ];
 
 export default function DashboardLayout({ children }) {
@@ -64,9 +66,8 @@ export default function DashboardLayout({ children }) {
     return () => window.removeEventListener("storage", syncDebt);
   }, [user, isLoadingAuth]);
 
-  const handleDeposit = async () => {
-    if (!user) return;
-    addCoins(1000);
+  const handleDeposit = () => {
+    window.location.href = "/dashboard/wallet";
   };
 
   const handleLogout = async () => {
@@ -277,6 +278,9 @@ export default function DashboardLayout({ children }) {
 
       {/* Command Palette */}
       <CommandPalette />
+
+      {/* Legal Footer */}
+      <LegalFooter />
     </div>
   );
 }

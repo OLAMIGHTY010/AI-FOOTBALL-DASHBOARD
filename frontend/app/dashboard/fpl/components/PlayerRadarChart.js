@@ -6,16 +6,17 @@ export default function PlayerRadarChart({ players }) {
   const [player1Id, setPlayer1Id] = useState("");
   const [player2Id, setPlayer2Id] = useState("");
 
-  const player1 = players.find(p => p.id === parseInt(player1Id));
-  const player2 = players.find(p => p.id === parseInt(player2Id));
+  const safePlayers = Array.isArray(players) ? players : [];
+  const player1 = safePlayers.find(p => p.id === parseInt(player1Id));
+  const player2 = safePlayers.find(p => p.id === parseInt(player2Id));
 
   const chartData = useMemo(() => {
     if (!player1 && !player2) return [];
 
     // Normalize stats to a 0-100 scale for better radar visualization
-    const maxPoints = Math.max(...players.map(p => p.expected_points || 0), 10);
-    const maxCost = Math.max(...players.map(p => p.cost || p.price || 0), 15);
-    const maxForm = Math.max(...players.map(p => p.form || 0), 10);
+    const maxPoints = Math.max(...safePlayers.map(p => p.expected_points || 0), 10);
+    const maxCost = Math.max(...safePlayers.map(p => p.cost || p.price || 0), 15);
+    const maxForm = Math.max(...safePlayers.map(p => p.form || 0), 10);
 
     const metrics = [
       { subject: 'Form', key: 'form', max: maxForm },
@@ -54,7 +55,7 @@ export default function PlayerRadarChart({ players }) {
           onChange={(e) => setPlayer1Id(e.target.value)}
         >
           <option value="">Select Player 1...</option>
-          {players.map(p => (
+          {safePlayers.map(p => (
             <option key={p.id} value={p.id}>{p.name} ({p.position})</option>
           ))}
         </select>
@@ -65,7 +66,7 @@ export default function PlayerRadarChart({ players }) {
           onChange={(e) => setPlayer2Id(e.target.value)}
         >
           <option value="">Select Player 2...</option>
-          {players.map(p => (
+          {safePlayers.map(p => (
             <option key={p.id} value={p.id}>{p.name} ({p.position})</option>
           ))}
         </select>

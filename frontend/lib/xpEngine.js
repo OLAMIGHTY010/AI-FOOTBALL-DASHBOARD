@@ -5,8 +5,8 @@ export const BADGES = {
   first_bet: { id: 'first_bet', icon: '🎟️', name: 'First Bet Placed', desc: 'You placed your very first bet in the sportsbook.', xp: 50 },
   high_roller: { id: 'high_roller', icon: '🔥', name: 'High Roller', desc: 'Placed 10+ bets in the Virtual Sportsbook.', xp: 200 },
   predictor_king: { id: 'predictor_king', icon: '👑', name: 'Predictor King', desc: 'Submitted predictions for a weekly tournament.', xp: 150 },
-  tycoon: { id: 'tycoon', icon: '💰', name: 'Tycoon', desc: 'Earned over £500 in net profit.', xp: 500 },
-  jackpot: { id: 'jackpot', icon: '🎰', name: 'Jackpot', desc: 'Won over £200 from a single bet.', xp: 300 },
+  tycoon: { id: 'tycoon', icon: '💰', name: 'Tycoon', desc: 'Earned over ₦500 in net profit.', xp: 500 },
+  jackpot: { id: 'jackpot', icon: '🎰', name: 'Jackpot', desc: 'Won over ₦200 from a single bet.', xp: 300 },
   loyal_manager: { id: 'loyal_manager', icon: '📅', name: 'Loyal Manager', desc: 'Logged in for 3 consecutive days.', xp: 100 },
   level_10: { id: 'level_10', icon: '🌟', name: 'Veteran', desc: 'Reached Level 10.', xp: 1000 },
 };

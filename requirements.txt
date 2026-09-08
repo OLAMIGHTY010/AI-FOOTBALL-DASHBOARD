@@ -1,0 +1,8 @@
+# Streamlit App Dependencies
+streamlit>=1.30.0
+pandas
+plotly
+python-dotenv
+supabase
+requests
+streamlit-sortables

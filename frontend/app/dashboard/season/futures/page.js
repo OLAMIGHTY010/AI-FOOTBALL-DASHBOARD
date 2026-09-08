@@ -5,7 +5,7 @@ import { LEAGUES, calculateTable } from "@/lib/seasonEngine";
 import { useAppContext } from "@/app/context/AppContext";
 
 export default function SeasonFuturesPage() {
-  const { aiCoins, addAiCoins } = useAppContext();
+  const { aiCoins, addCoins } = useAppContext();
   const [seasonState, setSeasonState] = useState(null);
   const [table, setTable] = useState([]);
   const [isClient, setIsClient] = useState(false);
@@ -73,7 +73,7 @@ export default function SeasonFuturesPage() {
     }
 
     // Deduct coins
-    addAiCoins(-betAmount);
+    addCoins(-betAmount);
 
     // Save bet to season state
     const newBet = {
@@ -96,7 +96,7 @@ export default function SeasonFuturesPage() {
     setSeasonState(newState);
     localStorage.setItem("seasonState", JSON.stringify(newState));
     
-    alert(`Bet Placed! £${betAmount} on ${selectedBet.teamName} to win the league.`);
+    alert(`Bet Placed! ₦${betAmount} on ${selectedBet.teamName} to win the league.`);
     setSelectedBet(null);
   };
 
@@ -111,7 +111,7 @@ export default function SeasonFuturesPage() {
         </div>
         <div className="flex items-center gap-4">
           <div className="bg-[#162032] border border-[var(--border-color)] px-4 py-2 rounded-lg font-black text-yellow-400">
-            Bankroll: £{aiCoins.toFixed(2)}
+            Bankroll: ₦{aiCoins.toFixed(2)}
           </div>
           <Link href="/dashboard/season" className="btn-secondary px-4 py-2 text-sm">
             ← Back to Hub
@@ -181,7 +181,7 @@ export default function SeasonFuturesPage() {
                   </div>
                   
                   <div>
-                    <label className="text-xs font-bold text-[var(--text-secondary)] block mb-2">Stake (£)</label>
+                    <label className="text-xs font-bold text-[var(--text-secondary)] block mb-2">Stake (₦)</label>
                     <div className="flex gap-2">
                       <input 
                         type="number" 
@@ -198,7 +198,7 @@ export default function SeasonFuturesPage() {
                           onClick={() => setBetAmount(amt)}
                           className="flex-1 bg-white/5 hover:bg-white/10 rounded py-1 text-xs font-bold transition-colors"
                         >
-                          +£{amt}
+                          +₦{amt}
                         </button>
                       ))}
                     </div>
@@ -206,7 +206,7 @@ export default function SeasonFuturesPage() {
 
                   <div className="flex justify-between items-center py-2 border-t border-[var(--border-color)]">
                     <span className="text-sm text-[var(--text-secondary)]">Potential Win:</span>
-                    <span className="font-black text-green-400">£{(betAmount * selectedBet.odds).toFixed(2)}</span>
+                    <span className="font-black text-green-400">₦{(betAmount * selectedBet.odds).toFixed(2)}</span>
                   </div>
 
                   <button 
@@ -231,8 +231,8 @@ export default function SeasonFuturesPage() {
                         <span className="text-[var(--accent-primary)]">{bet.odds}</span>
                       </div>
                       <div className="flex justify-between text-xs text-[var(--text-secondary)]">
-                        <span>Stake: £{bet.stake}</span>
-                        <span>To Win: £{bet.potentialPayout}</span>
+                        <span>Stake: ₦{bet.stake}</span>
+                        <span>To Win: ₦{bet.potentialPayout}</span>
                       </div>
                       <div className="mt-1 text-[10px] text-gray-500 text-right">Placed GW{bet.weekPlaced}</div>
                     </div>

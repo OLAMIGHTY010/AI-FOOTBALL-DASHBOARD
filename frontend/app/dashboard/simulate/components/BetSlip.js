@@ -62,7 +62,7 @@ export default function BetSlip({ betSlip, setBetSlip, stake, setStake, placeBet
 
         <div className="flex justify-between items-end">
           <span className="text-sm text-[var(--text-secondary)]">To Win</span>
-          <span className="font-black text-xl text-green-400">£{potentialWin}</span>
+          <span className="font-black text-xl text-green-400">₦{potentialWin}</span>
         </div>
 
         <button 
