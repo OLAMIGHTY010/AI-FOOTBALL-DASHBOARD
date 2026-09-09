@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 
 const FALLBACK_NEWS = [
-  "LIVE: Welcome to AI Football Dashboard! ⚽",
+  "LIVE: Welcome to SimScoutbet! ⚽",
   "VIRTUAL: AI model correctly predicts matches! 🚀"
 ];
 

@@ -78,7 +78,8 @@ export default function TransferMarketPage() {
         deductCoins(listing.price);
         
         // Update local club state
-        const currentClub = JSON.parse(localStorage.getItem('ut_club') || '[]');
+        const rawClub = JSON.parse(localStorage.getItem('ut_club') || '[]');
+        const currentClub = Array.isArray(rawClub) ? rawClub : [];
         const newClub = [...currentClub, data.card];
         localStorage.setItem('ut_club', JSON.stringify(newClub));
         // Note: The RPC already updated the DB, so we don't strictly need to sync it up, 

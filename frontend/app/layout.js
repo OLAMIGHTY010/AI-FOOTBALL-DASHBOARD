@@ -10,13 +10,13 @@ const outfit = Outfit({
 });
 
 export const metadata = {
-  title: "AI Football Dashboard",
+  title: "SimScoutbet",
   description: "Real-money sports betting, FPL, and Ultimate Team platform",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "AI Football",
+    title: "SimScoutbet",
   },
 };
 

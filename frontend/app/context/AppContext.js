@@ -93,7 +93,7 @@ export function AppProvider({ children }) {
         }
       }
     } catch (err) {
-      console.error("Error fetching user profile:", err);
+      console.error("Error fetching user profile:", err?.message || JSON.stringify(err), err);
     }
   };
 

@@ -6,17 +6,17 @@ export default function MorePage() {
   const [tab, setTab] = useState("Tools");
 
   const tools = [
-    { name: "Gameweek History", icon: "📊" },
-    { name: "Transfer History", icon: "🔄" },
-    { name: "Watchlist", icon: "⭐" },
-    { name: "Statistics", icon: "📈" },
-    { name: "PL Table", icon: "📋" },
-    { name: "FDR Table", icon: "🗓️" },
-    { name: "Set Piece Takers", icon: "🎯" },
-    { name: "Favourites", icon: "❤️" },
-    { name: "Notes", icon: "📝" },
-    { name: "Find by ID", icon: "🔍" },
-    { name: "Update User Details", icon: "👤" },
+    { name: "Gameweek History", icon: "📊", href: "/dashboard/history" },
+    { name: "Transfer History", icon: "🔄", action: () => alert("Transfer History is coming soon!") },
+    { name: "Watchlist", icon: "⭐", action: () => alert("Watchlist is coming soon!") },
+    { name: "Statistics", icon: "📈", href: "/dashboard/fpl/stats" },
+    { name: "PL Table", icon: "📋", href: "/dashboard/standings" },
+    { name: "FDR Table", icon: "🗓️", href: "/dashboard/analytics" },
+    { name: "Set Piece Takers", icon: "🎯", href: "/dashboard/fpl/set-pieces" },
+    { name: "Favourites", icon: "❤️", action: () => alert("Favourites is coming soon!") },
+    { name: "Notes", icon: "📝", action: () => alert("Notes is coming soon!") },
+    { name: "Find by ID", icon: "🔍", action: () => alert("Find by ID is coming soon!") },
+    { name: "Update User Details", icon: "👤", href: "/dashboard/profile" },
   ];
 
   const [statuses, setStatuses] = useState([]);
@@ -62,13 +62,13 @@ export default function MorePage() {
       <div className="flex border-b border-gray-800 text-sm font-medium">
         <button 
           onClick={() => setTab("Tools")} 
-          className={`flex-1 py-3 text-center border-b-2 ${tab === 'Tools' ? 'border-[#37003c] text-white' : 'border-transparent text-gray-400'}`}
+          className={`flex-1 py-3 text-center border-b-2 ${tab === 'Tools' ? 'border-[var(--accent-primary)] text-white' : 'border-transparent text-gray-400'}`}
         >
           Tools
         </button>
         <button 
           onClick={() => setTab("Status")} 
-          className={`flex-1 py-3 text-center border-b-2 ${tab === 'Status' ? 'border-[#37003c] text-white' : 'border-transparent text-gray-400'}`}
+          className={`flex-1 py-3 text-center border-b-2 ${tab === 'Status' ? 'border-[var(--accent-primary)] text-white' : 'border-transparent text-gray-400'}`}
         >
           Status
         </button>
@@ -77,15 +77,31 @@ export default function MorePage() {
       <div className="p-4">
         {tab === "Tools" ? (
           <div className="space-y-2">
-            {tools.map(tool => (
-              <div key={tool.name} className="bg-[#162032] p-4 rounded-xl border border-gray-800 flex justify-between items-center cursor-pointer hover:bg-white/5 transition-colors">
-                <div className="flex items-center gap-3">
-                  <span className="text-xl">{tool.icon}</span>
-                  <span className="font-bold text-sm">{tool.name}</span>
+            {tools.map(tool => {
+              const InnerContent = (
+                <div className="bg-[#162032] p-4 rounded-xl border border-gray-800 flex justify-between items-center cursor-pointer hover:bg-white/5 hover:border-white/20 transition-all">
+                  <div className="flex items-center gap-3">
+                    <span className="text-xl">{tool.icon}</span>
+                    <span className="font-bold text-sm text-white">{tool.name}</span>
+                  </div>
+                  <span className="text-[var(--accent-primary)] text-lg">›</span>
                 </div>
-                <span className="text-gray-500">›</span>
-              </div>
-            ))}
+              );
+
+              if (tool.href) {
+                return (
+                  <Link key={tool.name} href={tool.href}>
+                    {InnerContent}
+                  </Link>
+                );
+              }
+
+              return (
+                <div key={tool.name} onClick={tool.action}>
+                  {InnerContent}
+                </div>
+              );
+            })}
           </div>
         ) : (
           <div className="space-y-4">

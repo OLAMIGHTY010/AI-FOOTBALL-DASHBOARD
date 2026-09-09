@@ -168,7 +168,7 @@ export default function IntroSequence({ onComplete }) {
             <div className="w-24 h-24 bg-green-500/20 rounded-full flex items-center justify-center mb-8 shadow-[0_0_50px_rgba(34,197,94,0.4)]">
                 <Activity size={48} className="text-green-400" />
             </div>
-            <h1 className="text-4xl font-black text-white mb-4 tracking-tighter">AI FOOTBALL</h1>
+            <h1 className="text-4xl font-black text-white mb-4 tracking-tighter">SIMSCOUTBET</h1>
             <p className="text-zinc-400 mb-12 max-w-sm text-center">
                 Build your ultimate squad, master tactics, and wager on live simulations.
             </p>

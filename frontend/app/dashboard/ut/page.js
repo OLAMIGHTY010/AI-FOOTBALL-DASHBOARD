@@ -44,7 +44,8 @@ export default function PackStorePage() {
       const hasIcon = cards.some(c => c.rarity === 'Icon');
       const hasGold = cards.some(c => c.rarity === 'Gold');
       
-      const club = JSON.parse(localStorage.getItem('ut_club') || '[]');
+      const rawClub = JSON.parse(localStorage.getItem('ut_club') || '[]');
+      const club = Array.isArray(rawClub) ? rawClub : [];
       const newClub = [...club, ...cards];
       localStorage.setItem('ut_club', JSON.stringify(newClub));
       if (user) syncGameState('ut_club', newClub);

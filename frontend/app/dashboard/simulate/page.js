@@ -415,8 +415,12 @@ function SimulatePage() {
     });
 
     if (newSettled.length > 0) {
-      setSettledBets([...settledBets, ...newSettled]);
+      const updatedSettled = [...settledBets, ...newSettled];
+      setSettledBets(updatedSettled);
+      localStorage.setItem("settled_bets", JSON.stringify(updatedSettled));
+      
       setPendingBets([]);
+      localStorage.setItem("pending_bets", JSON.stringify([]));
       
       if (totalWinnings > 0) {
         const newBankroll = aiCoins + totalWinnings;
@@ -558,9 +562,11 @@ function SimulatePage() {
     const newSettled = [...settledBets, { ...bet, status: 'CASH OUT', potential_payout: cashOutAmount }];
     
     setPendingBets(updatedPending);
+    localStorage.setItem("pending_bets", JSON.stringify(updatedPending));
     
     const limitedSettledBets = newSettled.slice(-20);
     setSettledBets(limitedSettledBets);
+    localStorage.setItem("settled_bets", JSON.stringify(limitedSettledBets));
     
     alert(`Cashed out for $${cashOutAmount}!`);
   };
@@ -633,7 +639,9 @@ function SimulatePage() {
       timestamp: Date.now()
     };
 
-    setPendingBets([...pendingBets, newBet]);
+    const updatedPending = [...pendingBets, newBet];
+    setPendingBets(updatedPending);
+    localStorage.setItem("pending_bets", JSON.stringify(updatedPending));
     setBetSlip([]);
     playSound("coin");
   };

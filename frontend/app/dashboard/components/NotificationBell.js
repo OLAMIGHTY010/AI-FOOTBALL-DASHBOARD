@@ -37,7 +37,7 @@ export default function NotificationBell() {
     if (saved.length === 0) {
       const welcome = {
         id: Date.now(),
-        message: "Welcome to AI Football Dashboard! 🎉",
+        message: "Welcome to SimScoutbet! 🎉",
         type: "success",
         timestamp: new Date().toLocaleTimeString(),
         read: false,

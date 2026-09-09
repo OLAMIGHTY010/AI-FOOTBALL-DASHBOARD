@@ -14,19 +14,44 @@ import { translations } from "@/lib/translations";
 
 const API_URL = "http://localhost:8000";
 
-const NAV_ITEMS = [
-  { href: "/dashboard", label: "Dashboard", id: "dashboard" },
-  { href: "/dashboard/season", label: "Season Mode", id: "seasonMode" },
-  { href: "/dashboard/simulate", label: "Virtual Hub", id: "virtualHub" },
-  { href: "/dashboard/ut", label: "Ultimate Team", id: "ultimateTeam" },
-  { href: "/dashboard/fpl", label: "FPL Hub", id: "fplHub" },
-  { href: "/dashboard/analytics", label: "Analytics", id: "analytics" },
-  { href: "/dashboard/leaderboards", label: "Global Ranks", id: "globalRanks" },
-  { href: "/dashboard/chat", label: "Global Chat", id: "globalChat" },
-  { href: "/dashboard/wallet", label: "💳 Wallet", id: "wallet" },
-  { href: "/dashboard/subscription", label: "👑 VIP", id: "subscription" },
-  { href: "/dashboard/profile", label: "Profile", id: "profile" },
-  { href: "/dashboard/responsible-gambling", label: "🛡️ Responsible Gambling", id: "responsibleGambling" },
+const NAV_GROUPS = [
+  {
+    label: "Play",
+    id: "navPlay",
+    items: [
+      { href: "/dashboard", label: "Dashboard", id: "dashboard" },
+      { href: "/dashboard/season", label: "Season Mode", id: "seasonMode" },
+      { href: "/dashboard/simulate", label: "Virtual Hub", id: "virtualHub" },
+    ]
+  },
+  {
+    label: "FPL & Fantasy",
+    id: "navFpl",
+    items: [
+      { href: "/dashboard/fpl", label: "FPL Hub", id: "fplHub" },
+      { href: "/dashboard/ut", label: "Ultimate Team", id: "ultimateTeam" },
+    ]
+  },
+  {
+    label: "Community",
+    id: "navCommunity",
+    items: [
+      { href: "/dashboard/pvp", label: "PvP Arena", id: "pvpArena" },
+      { href: "/dashboard/leaderboards", label: "Global Ranks", id: "globalRanks" },
+      { href: "/dashboard/chat", label: "Global Chat", id: "globalChat" },
+    ]
+  },
+  {
+    label: "Account",
+    id: "navAccount",
+    items: [
+      { href: "/dashboard/analytics", label: "Analytics", id: "analytics" },
+      { href: "/dashboard/wallet", label: "💳 Wallet", id: "wallet" },
+      { href: "/dashboard/subscription", label: "👑 VIP", id: "subscription" },
+      { href: "/dashboard/profile", label: "Profile", id: "profile" },
+      { href: "/dashboard/responsible-gambling", label: "🛡️ Safe Play", id: "responsibleGambling" },
+    ]
+  }
 ];
 
 export default function DashboardLayout({ children }) {
@@ -91,14 +116,25 @@ export default function DashboardLayout({ children }) {
       <nav className="navbar px-6 py-3">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-8">
-            <Link href="/dashboard" className="text-xl font-bold gradient-text">
-              ⚽ AI Football
+            <Link href="/dashboard" className="flex items-center gap-2">
+              <img src="/logo.png" alt="SimScoutbet Logo" className="w-8 h-8 rounded-full shadow-[0_0_10px_rgba(0,255,170,0.5)]" />
+              <span className="text-xl font-bold gradient-text hidden sm:block">SimScoutbet</span>
             </Link>
-            <div className="hidden md:flex items-center gap-1">
-              {NAV_ITEMS.map((item) => (
-                <Link key={item.id} href={item.href} className="nav-link">
-                  {t[item.id] || item.label}
-                </Link>
+            <div className="hidden md:flex items-center gap-4">
+              {NAV_GROUPS.map((group) => (
+                <div key={group.id} className="relative group">
+                  <button className="nav-link flex items-center gap-1 font-bold text-[var(--text-secondary)] hover:text-[var(--accent-primary)] pb-2">
+                    {t[group.id] || group.label}
+                    <span className="text-[10px]">▼</span>
+                  </button>
+                  <div className="absolute left-0 top-full mt-0 hidden group-hover:flex flex-col bg-[#0f172a] border border-[var(--border-color)] rounded-lg shadow-xl w-48 z-50 overflow-hidden py-1">
+                    {group.items.map((item) => (
+                      <Link key={item.id} href={item.href} className="px-4 py-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--accent-primary)] hover:text-black transition-colors">
+                        {t[item.id] || item.label}
+                      </Link>
+                    ))}
+                  </div>
+                </div>
               ))}
             </div>
           </div>
@@ -106,21 +142,21 @@ export default function DashboardLayout({ children }) {
           <div className="flex items-center gap-4">
             {debt > 0 && (
               <div className="hidden sm:block text-red-500 font-bold text-sm bg-red-500/10 px-3 py-1.5 rounded border border-red-500/50" title="Virtual Loan Debt">
-                Debt: ${debt.toFixed(2)}
+                Debt: ₦{debt.toFixed(2)}
               </div>
             )}
             {/* Wallet */}
             <div className="glass-card !p-2 !px-4 flex items-center gap-3">
               <span className="text-sm text-[var(--text-secondary)]">💳</span>
               <span className="font-bold text-[var(--accent-primary)]">
-                ${aiCoins.toFixed(2)}
+                ₦{aiCoins.toFixed(2)}
               </span>
             </div>
             <button
               onClick={handleDeposit}
-              className="text-xs bg-[var(--accent-primary)] text-[var(--bg-primary)] px-2 py-1 rounded-md font-bold hover:opacity-90 transition-opacity"
+              className="text-xs bg-[var(--accent-primary)] text-[var(--bg-primary)] px-3 py-2 rounded-md font-bold hover:opacity-90 transition-opacity flex items-center gap-1"
             >
-              + $1K
+              Manage Wallet
             </button>
 
             {/* Language Selector */}
@@ -172,7 +208,7 @@ export default function DashboardLayout({ children }) {
 
       {/* Mobile Nav */}
       <div className="md:hidden flex gap-1 p-2 overflow-x-auto border-b border-[var(--border-color)]">
-        {NAV_ITEMS.map((item) => (
+        {NAV_GROUPS.flatMap(group => group.items).map((item) => (
           <Link key={item.id} href={item.href} className="nav-link whitespace-nowrap text-xs">
             {t[item.id] || item.label}
           </Link>

@@ -15,7 +15,8 @@ export default function SBCPage() {
   const [errorMsg, setErrorMsg] = useState("");
 
   useEffect(() => {
-    const club = JSON.parse(localStorage.getItem('ut_club') || '[]');
+    const rawClub = JSON.parse(localStorage.getItem('ut_club') || '[]');
+    const club = Array.isArray(rawClub) ? rawClub : [];
     setMyClub(club);
   }, []);
 

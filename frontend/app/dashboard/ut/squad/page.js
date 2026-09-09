@@ -66,7 +66,8 @@ export default function SquadBuilderPage() {
   const [formationId, setFormationId] = useState("4-4-2");
 
   useEffect(() => {
-    setClub(JSON.parse(localStorage.getItem("ut_club") || "[]"));
+    const rawClub = JSON.parse(localStorage.getItem("ut_club") || "[]");
+    setClub(Array.isArray(rawClub) ? rawClub : []);
     const savedSquadState = JSON.parse(localStorage.getItem("ut_active_squad") || "{}");
     if (savedSquadState.squad && savedSquadState.squad.length === 11) {
       setSquad(savedSquadState.squad);

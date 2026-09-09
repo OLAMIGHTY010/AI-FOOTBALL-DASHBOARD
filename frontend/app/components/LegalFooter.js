@@ -42,7 +42,7 @@ export default function LegalFooter() {
 
         {/* Copyright */}
         <p className="text-center text-[10px] text-[var(--text-secondary)] mt-3 opacity-60">
-          © {new Date().getFullYear()} AI Football Dashboard. All rights reserved.
+          © {new Date().getFullYear()} SimScoutbet. All rights reserved.
           Virtual match outcomes are determined by probability-based algorithms. Past performance does not guarantee future results.
         </p>
       </div>

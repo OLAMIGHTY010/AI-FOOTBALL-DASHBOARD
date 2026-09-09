@@ -11,7 +11,8 @@ export default function MyClubPage() {
   const [club, setClub] = useState([]);
 
   useEffect(() => {
-    setClub(JSON.parse(localStorage.getItem("ut_club") || "[]"));
+    const rawClub = JSON.parse(localStorage.getItem("ut_club") || "[]");
+    setClub(Array.isArray(rawClub) ? rawClub : []);
   }, []);
 
   const sellCard = async (index, value) => {

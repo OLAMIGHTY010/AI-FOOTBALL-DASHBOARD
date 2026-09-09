@@ -16,6 +16,7 @@ function VirtualTabsContent() {
     { name: '📊 Sportsbook', path: '/dashboard/sportsbook' },
     { name: '📜 Bet History', path: '/dashboard/history' },
     { name: '👔 Tactics', path: '/dashboard/tactics' },
+    { name: '🎲 Mini Games', path: '/dashboard/simulate/minigames' },
   ];
 
   return (

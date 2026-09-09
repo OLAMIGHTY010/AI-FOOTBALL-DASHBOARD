@@ -840,6 +840,14 @@ class JoinLobbyRequest(BaseModel):
 
 @app.post("/api/pvp/create")
 def create_pvp_lobby(req: CreateLobbyRequest):
+    if supabase and req.wager > 0:
+        # Check wallet and deduct wager
+        wallet_res = supabase.table("profiles").select("bankroll").eq("id", req.user_id).execute()
+        if not wallet_res.data or wallet_res.data[0]["bankroll"] < req.wager:
+            raise HTTPException(status_code=400, detail="Insufficient funds")
+        new_bal = float(wallet_res.data[0]["bankroll"]) - req.wager
+        supabase.table("profiles").update({"bankroll": new_bal}).eq("id", req.user_id).execute()
+
     lobby_id = str(uuid.uuid4())
     pvp_lobbies[lobby_id] = {
         "id": lobby_id,
@@ -868,27 +876,52 @@ def join_pvp_lobby(req: JoinLobbyRequest):
     if lobby["status"] != "waiting":
         raise HTTPException(status_code=400, detail="Lobby already closed")
     
-    # Simulate match
-    # Baseline chance based on ratings
+    wager = lobby["wager"]
+    
+    if supabase and wager > 0:
+        # Check wallet and deduct wager for joiner
+        wallet_res = supabase.table("profiles").select("bankroll").eq("id", req.user_id).execute()
+        if not wallet_res.data or wallet_res.data[0]["bankroll"] < wager:
+            raise HTTPException(status_code=400, detail="Insufficient funds to match wager")
+        new_bal = float(wallet_res.data[0]["bankroll"]) - wager
+        supabase.table("profiles").update({"bankroll": new_bal}).eq("id", req.user_id).execute()
+
+    # Simulate realistic match instead of simple coin flip
     creator_chance = lobby["creator_rating"] / (lobby["creator_rating"] + req.team_rating)
-    roll = random.random()
     
-    winner = "creator" if roll <= creator_chance else "joiner"
+    # Generate scores based on ratings
+    creator_goals = 0
+    joiner_goals = 0
     
-    # 20% chance of draw if teams are within 5 rating of each other
-    if abs(lobby["creator_rating"] - req.team_rating) <= 5 and random.random() < 0.2:
+    # 5 chances per team
+    for _ in range(5):
+        if random.random() < (creator_chance * 0.8):
+            creator_goals += 1
+        if random.random() < ((1.0 - creator_chance) * 0.8):
+            joiner_goals += 1
+            
+    if creator_goals > joiner_goals:
+        winner = "creator"
+    elif joiner_goals > creator_goals:
+        winner = "joiner"
+    else:
         winner = "draw"
 
-    wager = lobby["wager"]
     total_pot = wager * 2
     
     if winner == "draw":
-        # Draw returns original wager to both
         payout = wager
+        # Refund both
+        if supabase and wager > 0:
+            supabase.rpc("process_deposit", {"p_user_id": lobby["creator_id"], "p_amount": payout}).execute()
+            supabase.rpc("process_deposit", {"p_user_id": req.user_id, "p_amount": payout}).execute()
     else:
         # 10% company fee taken from the total pot
         house_fee = total_pot * 0.10
         payout = total_pot - house_fee
+        winner_id = lobby["creator_id"] if winner == "creator" else req.user_id
+        if supabase and payout > 0:
+            supabase.rpc("process_deposit", {"p_user_id": winner_id, "p_amount": payout}).execute()
 
     lobby["status"] = "resolved"
     lobby["joiner_id"] = req.user_id
@@ -898,6 +931,8 @@ def join_pvp_lobby(req: JoinLobbyRequest):
     lobby["result"] = {
         "winner": winner,
         "payout": payout,
+        "creator_goals": creator_goals,
+        "joiner_goals": joiner_goals,
         "creator_chance_percent": round(creator_chance * 100, 1)
     }
 
@@ -967,7 +1002,53 @@ def create_league(req: CreateLeagueRequest):
 
 @app.get("/api/fpl/recommender")
 def fpl_recommender():
-    return {"message": "Recommender active"}
+    bootstrap = get_fpl_bootstrap()
+    if "error" in bootstrap:
+        return {"buys": [], "sells": []}
+        
+    elements = bootstrap.get("elements", [])
+    teams = {t["id"]: t["short_name"] for t in bootstrap.get("teams", [])}
+    positions = {1: "GK", 2: "DEF", 3: "MID", 4: "FWD"}
+    
+    analyzed_players = []
+    
+    for p in elements:
+        # Skip inactive or 0 minute players
+        if p.get("status") != "a" or p.get("minutes", 0) == 0:
+            continue
+            
+        form = float(p.get("form", 0.0))
+        ep_next = float(p.get("ep_next", 0.0) or 0.0)
+        ppg = float(p.get("points_per_game", 0.0))
+        selected_by = float(p.get("selected_by_percent", 0.0))
+        
+        # Calculate AI Performance Percentage
+        # Blending Short-term (form, ep_next) and Long-term (ppg) as requested by user
+        raw_score = (form * 5.0) + (ep_next * 4.0) + (ppg * 2.0)
+        ai_percentage = min(100.0, max(0.0, raw_score))
+        
+        analyzed_players.append({
+            "id": p["id"],
+            "name": p["web_name"],
+            "team": teams.get(p["team"], "UNK"),
+            "position": positions.get(p["element_type"], "UNK"),
+            "cost": round(p["now_cost"] / 10.0, 1),
+            "form": form,
+            "ai_percentage": round(ai_percentage, 1),
+            "selected_by": selected_by
+        })
+        
+    # Top Buys: Highest AI Percentage
+    top_buys = sorted(analyzed_players, key=lambda x: x["ai_percentage"], reverse=True)[:5]
+    
+    # Top Sells: Lowest AI Percentage among highly owned players (> 5%)
+    highly_owned = [p for p in analyzed_players if p["selected_by"] > 5.0]
+    top_sells = sorted(highly_owned, key=lambda x: x["ai_percentage"])[:5]
+    
+    return {
+        "buys": top_buys,
+        "sells": top_sells
+    }
 
 @app.get("/api/fpl/my-team/{entry_id}")
 def get_my_fpl_team(entry_id: int):
@@ -1479,6 +1560,183 @@ def get_live_news():
         
     return {"news": news_items}
 
+
+# ──────────────────────────────────────────────
+# Virtual Raffle Draw Endpoints
+# ──────────────────────────────────────────────
+
+class RafflePlayRequest(BaseModel):
+    user_id: str
+    wager: float
+
+@app.post("/api/games/raffle/play")
+def api_raffle_play(req: RafflePlayRequest):
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Database not configured.")
+    if req.wager <= 0:
+        raise HTTPException(status_code=400, detail="Wager must be greater than 0.")
+        
+    # Check wallet and deduct wager
+    wallet_res = supabase.table("profiles").select("bankroll").eq("id", req.user_id).execute()
+    if not wallet_res.data or float(wallet_res.data[0]["bankroll"]) < req.wager:
+        raise HTTPException(status_code=400, detail="Insufficient funds")
+    
+    new_bal = float(wallet_res.data[0]["bankroll"]) - req.wager
+    supabase.table("profiles").update({"bankroll": new_bal}).eq("id", req.user_id).execute()
+    
+    # RNG Logic
+    roll = random.random()
+    payout_multiplier = 0
+    tier = "Loss"
+    
+    if roll < 0.05:
+        payout_multiplier = 50.0
+        tier = "Jackpot"
+    elif roll < 0.20:
+        payout_multiplier = 5.0
+        tier = "Big Win"
+    elif roll < 0.40:
+        payout_multiplier = 1.5
+        tier = "Small Win"
+        
+    payout = req.wager * payout_multiplier
+    
+    # 10% House Fee applies only to winnings (profit)
+    if payout > 0:
+        profit = payout - req.wager
+        if profit > 0:
+            house_fee = profit * 0.10
+            final_payout = payout - house_fee
+        else:
+            final_payout = payout
+            
+        supabase.rpc("process_deposit", {"p_user_id": req.user_id, "p_amount": final_payout}).execute()
+    else:
+        final_payout = 0
+        
+    return {
+        "tier": tier,
+        "multiplier": payout_multiplier,
+        "payout": final_payout,
+        "new_balance": new_bal + final_payout
+    }
+
+class MiniGameRequest(BaseModel):
+    user_id: str
+    wager: float
+    action: Optional[str] = None
+
+def _deduct_wager(user_id: str, wager: float):
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Database not configured.")
+    if wager <= 0:
+        raise HTTPException(status_code=400, detail="Wager must be > 0.")
+    wallet_res = supabase.table("profiles").select("bankroll").eq("id", user_id).execute()
+    if not wallet_res.data or float(wallet_res.data[0]["bankroll"]) < wager:
+        raise HTTPException(status_code=400, detail="Insufficient funds")
+    new_bal = float(wallet_res.data[0]["bankroll"]) - wager
+    supabase.table("profiles").update({"bankroll": new_bal}).eq("id", user_id).execute()
+    return new_bal
+
+def _process_payout(user_id: str, wager: float, payout: float, new_bal: float):
+    if payout > 0:
+        profit = payout - wager
+        if profit > 0:
+            house_fee = profit * 0.10
+            final_payout = payout - house_fee
+        else:
+            final_payout = payout
+        supabase.rpc("process_deposit", {"p_user_id": user_id, "p_amount": final_payout}).execute()
+        return new_bal + final_payout, final_payout
+    return new_bal, 0
+
+@app.post("/api/games/crash/play")
+def api_crash_play(req: MiniGameRequest):
+    new_bal = _deduct_wager(req.user_id, req.wager)
+    
+    # Generate crash point using inverse exponential
+    # e.g., 1% chance of instant crash at 1.00x, heavy weight between 1.1x and 2.5x
+    u = random.random()
+    crash_point = max(1.00, float(format(0.99 / (1.0 - u), '.2f')))
+    if random.random() < 0.05:
+        crash_point = 1.00 # 5% house edge instant crash
+        
+    return {"crash_point": crash_point, "new_balance": new_bal}
+
+class CrashCashoutRequest(BaseModel):
+    user_id: str
+    wager: float
+    multiplier: float
+
+@app.post("/api/games/crash/cashout")
+def api_crash_cashout(req: CrashCashoutRequest):
+    # This assumes the frontend safely verified the cashout before the crash_point.
+    # In a real app, the server holds the active session. Here, we trust the client for demo purposes.
+    payout = req.wager * req.multiplier
+    wallet_res = supabase.table("profiles").select("bankroll").eq("id", req.user_id).execute()
+    if not wallet_res.data:
+        raise HTTPException(status_code=400, detail="User not found")
+    new_bal = float(wallet_res.data[0]["bankroll"])
+    final_bal, final_payout = _process_payout(req.user_id, req.wager, payout, new_bal)
+    return {"payout": final_payout, "new_balance": final_bal}
+
+@app.post("/api/games/penalty/shoot")
+def api_penalty_shoot(req: MiniGameRequest):
+    new_bal = _deduct_wager(req.user_id, req.wager)
+    # 75% chance to score
+    is_goal = random.random() < 0.75
+    payout = req.wager * 1.25 if is_goal else 0
+    final_bal, final_payout = _process_payout(req.user_id, req.wager, payout, new_bal)
+    return {"is_goal": is_goal, "payout": final_payout, "new_balance": final_bal}
+
+@app.post("/api/games/hilo/play")
+def api_hilo_play(req: MiniGameRequest):
+    new_bal = _deduct_wager(req.user_id, req.wager)
+    # Action = "higher" or "lower"
+    # Assuming base number is 50 for simplicity
+    next_num = random.randint(1, 100)
+    won = False
+    if req.action == "higher" and next_num > 50:
+        won = True
+    elif req.action == "lower" and next_num < 50:
+        won = True
+        
+    payout = req.wager * 1.90 if won else 0
+    final_bal, final_payout = _process_payout(req.user_id, req.wager, payout, new_bal)
+    return {"next_num": next_num, "won": won, "payout": final_payout, "new_balance": final_bal}
+
+@app.post("/api/games/slots/spin")
+def api_slots_spin(req: MiniGameRequest):
+    new_bal = _deduct_wager(req.user_id, req.wager)
+    symbols = ["⚽", "🏆", "🟨", "🟥", "👟"]
+    weights = [40, 10, 20, 15, 15] # ⚽ is common, 🏆 is rare
+    reel1 = random.choices(symbols, weights=weights)[0]
+    reel2 = random.choices(symbols, weights=weights)[0]
+    reel3 = random.choices(symbols, weights=weights)[0]
+    
+    payout = 0
+    tier = "Loss"
+    if reel1 == reel2 == reel3:
+        if reel1 == "🏆":
+            payout = req.wager * 50
+            tier = "Jackpot"
+        elif reel1 == "⚽":
+            payout = req.wager * 10
+            tier = "Big Win"
+        else:
+            payout = req.wager * 5
+            tier = "Win"
+    elif reel1 == reel2 or reel2 == reel3 or reel1 == reel3:
+        payout = req.wager * 1.5
+        tier = "Small Win"
+        
+    final_bal, final_payout = _process_payout(req.user_id, req.wager, payout, new_bal)
+    return {
+        "reels": [reel1, reel2, reel3],
+        "tier": tier,
+        "payout": final_payout,
+        "new_balance": final_bal
+    }
 
 # ──────────────────────────────────────────────
 # Responsible Gambling API Endpoints
